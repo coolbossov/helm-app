@@ -1,0 +1,21 @@
+name: Push Sync to Bigin
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+jobs:
+  push-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger push sync
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -X GET "${{ secrets.APP_URL }}/api/sync/cron" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
+          echo "HTTP status: $response"
+          if [ "$response" != "200" ]; then
+            echo "Push sync failed with status $response"
+            exit 1
+          fi
