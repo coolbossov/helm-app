@@ -38,8 +38,11 @@ export async function updateSession(request: NextRequest) {
   const isAuthRoute = request.nextUrl.pathname.startsWith("/login");
   const isApiRoute = request.nextUrl.pathname.startsWith("/api");
 
-  // Allow API health check without auth
-  if (request.nextUrl.pathname === "/api/health") {
+  // Allow API health check and cron endpoint without session auth (use their own auth)
+  if (
+    request.nextUrl.pathname === "/api/health" ||
+    request.nextUrl.pathname === "/api/sync/cron"
+  ) {
     return supabaseResponse;
   }
 
