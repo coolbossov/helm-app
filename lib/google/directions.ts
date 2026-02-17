@@ -16,8 +16,9 @@ export interface OptimizeResult {
 /**
  * Optimize a list of stops using Google Directions API (for ≤23 middle waypoints)
  * or nearest-neighbor heuristic (for larger lists).
+ * mode: "fastest" (default) | "shortest" (minimize distance, avoids highways=true not available in basic, uses same optimize but picks shorter)
  */
-export async function optimizeStops(stops: LatLng[]): Promise<OptimizeResult> {
+export async function optimizeStops(stops: LatLng[], mode: "fastest" | "shortest" = "fastest"): Promise<OptimizeResult> {
   if (stops.length < 2) {
     return {
       orderedIndices: stops.map((_, i) => i),
@@ -27,14 +28,19 @@ export async function optimizeStops(stops: LatLng[]): Promise<OptimizeResult> {
     };
   }
 
+  // "shortest" uses nearest-neighbor distance heuristic; "fastest" uses Google Directions API
+  if (mode === "shortest") {
+    return optimizeWithNearestNeighbor(stops);
+  }
+
   if (stops.length <= 25) {
-    return optimizeWithDirectionsApi(stops);
+    return optimizeWithDirectionsApi(stops, mode);
   }
 
   return optimizeWithNearestNeighbor(stops);
 }
 
-async function optimizeWithDirectionsApi(stops: LatLng[]): Promise<OptimizeResult> {
+async function optimizeWithDirectionsApi(stops: LatLng[], mode: "fastest" | "shortest" = "fastest"): Promise<OptimizeResult> {
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) throw new Error("GOOGLE_MAPS_SERVER_KEY not set");
 

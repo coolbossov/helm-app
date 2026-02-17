@@ -8,6 +8,7 @@ const patchSchema = z.object({
   contacting_status: z.enum(["Not Contacted", "Attempted", "In Conversation", "Follow Up", "Not Interested", "Closed"]).optional(),
   priority: z.enum(["High Priority", "Medium Priority", "Low Priority", "Warm Priority", "Hot Priority"]).optional(),
   contacting_tips: z.string().max(2000).optional(),
+  business_type: z.array(z.enum(["Dance", "School", "Daycare", "Cheer", "Sports", "Other"])).optional(),
 });
 
 export async function GET(
@@ -81,12 +82,15 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Queue field update for Zoho sync
-  await admin.from("field_updates").insert({
-    contact_id: id,
-    changes: updates,
-    status: "pending",
-  });
+  // Queue field update for Zoho sync (exclude HELM-only fields)
+  const { business_type: _bt, ...biginFields } = updates as Record<string, unknown> & { business_type?: unknown };
+  if (Object.keys(biginFields).length > 0) {
+    await admin.from("field_updates").insert({
+      contact_id: id,
+      changes: biginFields,
+      status: "pending",
+    });
+  }
 
   // Auto-log status_change activity for key field changes
   const statusFields = ["lifecycle_stage", "contacting_status", "priority"];

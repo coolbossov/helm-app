@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { SavedRoute, RouteStop } from "@/types/routes";
+import type { SavedRoute, RouteStop, OptimizationMode } from "@/types/routes";
 import { enqueueOfflineMutation } from "@/lib/offline/sync-queue";
 
 interface RouteWithStops extends SavedRoute {
@@ -115,17 +115,54 @@ export function useRoute(id: string | null) {
       });
       if (!res.ok) throw new Error("Server error");
     } catch {
-      // Queue for replay when back online
       await enqueueOfflineMutation("PATCH", `/api/routes/${id}/stops/${stopId}`, { status });
     }
   }, [id]);
 
-  const optimizeRoute = useCallback(async () => {
+  const updateStopMeta = useCallback(async (
+    stopId: string,
+    patch: {
+      priority?: "must_visit" | "nice_to_visit";
+      time_window_start?: string | null;
+      time_window_end?: string | null;
+      expected_duration_min?: number;
+      visit_outcome?: string | null;
+      visit_notes?: string | null;
+    }
+  ) => {
     if (!id) return;
-    const res = await fetch(`/api/routes/${id}/optimize`, { method: "POST" });
+
+    setRoute((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        route_stops: prev.route_stops.map((s) =>
+          s.id === stopId ? { ...s, ...patch } : s
+        ),
+      };
+    });
+
+    try {
+      await fetch(`/api/routes/${id}/stops/${stopId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+    } catch {
+      await enqueueOfflineMutation("PATCH", `/api/routes/${id}/stops/${stopId}`, patch);
+    }
+  }, [id]);
+
+  const optimizeRoute = useCallback(async (mode: OptimizationMode = "fastest") => {
+    if (!id) return;
+    const res = await fetch(`/api/routes/${id}/optimize`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mode }),
+    });
     if (res.ok) await fetchRoute();
     return res.ok;
   }, [id, fetchRoute]);
 
-  return { route, loading, error, updateStopStatus, optimizeRoute, refresh: fetchRoute };
+  return { route, loading, error, updateStopStatus, updateStopMeta, optimizeRoute, refresh: fetchRoute };
 }

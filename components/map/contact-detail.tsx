@@ -11,6 +11,8 @@ import {
   MapPin,
   AlertCircle,
   Plus,
+  Pencil,
+  Check,
 } from "lucide-react";
 import { Button, BusinessTypeBadge, Badge, Spinner } from "@/components/ui";
 import { useContactDetail } from "@/lib/hooks";
@@ -18,6 +20,9 @@ import { useActivities } from "@/lib/hooks/use-activities";
 import { ActivityTimeline } from "./activity-timeline";
 import { AddNoteForm } from "./add-note-form";
 import { formatPhone, formatAddress, getDisplayName } from "@/lib/utils";
+import { BUSINESS_TYPE_COLORS } from "@/types";
+
+const BUSINESS_TYPES = Object.keys(BUSINESS_TYPE_COLORS);
 
 interface ContactDetailProps {
   contactId: string | null;
@@ -25,9 +30,41 @@ interface ContactDetailProps {
 }
 
 export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
-  const { contact, loading } = useContactDetail(contactId);
+  const { contact, loading, refetch } = useContactDetail(contactId);
   const { activities, loading: activitiesLoading, addActivity } = useActivities(contactId);
   const [addingNote, setAddingNote] = useState(false);
+  const [editingTypes, setEditingTypes] = useState(false);
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [savingTypes, setSavingTypes] = useState(false);
+
+  const startEditTypes = () => {
+    setSelectedTypes(contact?.business_type ?? []);
+    setEditingTypes(true);
+  };
+
+  const toggleType = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  const saveTypes = async () => {
+    if (!contactId) return;
+    setSavingTypes(true);
+    try {
+      await fetch(`/api/contacts/${contactId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ business_type: selectedTypes }),
+      });
+      setEditingTypes(false);
+      refetch();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingTypes(false);
+    }
+  };
 
   if (!contactId) return null;
 
@@ -83,15 +120,60 @@ export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
       </div>
 
       <div className="space-y-4 px-4 py-4">
-        {/* Badges */}
+        {/* Business Type Badges */}
+        <div>
+          <div className="flex items-center justify-between mb-1.5">
+            <div className="flex flex-wrap gap-1.5">
+              {!editingTypes && contact.business_type.map((type) => (
+                <BusinessTypeBadge key={type} type={type} />
+              ))}
+            </div>
+            {!editingTypes ? (
+              <button
+                onClick={startEditTypes}
+                className="rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600"
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </button>
+            ) : (
+              <button
+                onClick={saveTypes}
+                disabled={savingTypes}
+                className="flex items-center gap-1 rounded px-2 py-0.5 text-xs font-medium text-green-600 hover:bg-green-50"
+              >
+                {savingTypes ? <Spinner /> : <Check className="h-3.5 w-3.5" />}
+                Save
+              </button>
+            )}
+          </div>
+          {editingTypes && (
+            <div className="flex flex-wrap gap-2 rounded-lg border border-gray-200 p-2">
+              {BUSINESS_TYPES.map((type) => (
+                <button
+                  key={type}
+                  onClick={() => toggleType(type)}
+                  className={`rounded-full px-3 py-1 text-xs font-medium border transition-colors ${
+                    selectedTypes.includes(type)
+                      ? "text-white border-transparent"
+                      : "text-gray-500 border-gray-200 bg-white hover:bg-gray-50"
+                  }`}
+                  style={
+                    selectedTypes.includes(type)
+                      ? { backgroundColor: BUSINESS_TYPE_COLORS[type] }
+                      : undefined
+                  }
+                >
+                  {type}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Status Badges */}
         <div className="flex flex-wrap gap-1.5">
-          {contact.business_type.map((type) => (
-            <BusinessTypeBadge key={type} type={type} />
-          ))}
           {contact.priority && (
-            <Badge
-              className="bg-amber-50 text-amber-700 border border-amber-200"
-            >
+            <Badge className="bg-amber-50 text-amber-700 border border-amber-200">
               {contact.priority}
             </Badge>
           )}

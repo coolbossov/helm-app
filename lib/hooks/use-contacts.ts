@@ -44,12 +44,11 @@ export function useContactDetail(id: string | null) {
   const [contact, setContact] = useState<SyncedContact | null>(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const fetchContact = useCallback(() => {
     if (!id) {
       setContact(null);
       return;
     }
-
     setLoading(true);
     fetch(`/api/contacts/${id}`)
       .then((res) => res.json())
@@ -58,5 +57,9 @@ export function useContactDetail(id: string | null) {
       .finally(() => setLoading(false));
   }, [id]);
 
-  return { contact, loading };
+  useEffect(() => {
+    fetchContact();
+  }, [fetchContact]);
+
+  return { contact, loading, refetch: fetchContact };
 }

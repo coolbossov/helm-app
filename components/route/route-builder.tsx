@@ -2,12 +2,13 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Wand2, Save, X, ListPlus } from "lucide-react";
+import { Wand2, Save, X, ListPlus, FileUp } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
 import { FilterPanel } from "@/components/map/filter-panel";
 import { SearchBar } from "@/components/map/search-bar";
 import { StopList } from "@/components/route/stop-list";
 import { RouteStats } from "@/components/route/route-stats";
+import { ImportStopsModal } from "@/components/route/import-stops-modal";
 import { Button, Input, Spinner } from "@/components/ui";
 import { useContacts, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
@@ -34,6 +35,7 @@ export function RouteBuilder() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [panelOpen, setPanelOpen] = useState(true);
+  const [importOpen, setImportOpen] = useState(false);
 
   const handleMarkerClick = useCallback(
     (contact: ContactMarkerData) => {
@@ -97,20 +99,29 @@ export function RouteBuilder() {
               onChange={(e) => setRouteName(e.target.value)}
               className="w-full"
             />
-            {filtered.length > 0 && (
+            <div className="flex gap-2">
+              {filtered.length > 0 && (
+                <button
+                  onClick={() => {
+                    if (filtered.length > 50) {
+                      if (!window.confirm(`Add all ${filtered.length} filtered contacts to route?`)) return;
+                    }
+                    addMultipleStops(filtered);
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1.5 rounded-md border border-gray-200 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <ListPlus className="h-3.5 w-3.5" />
+                  Add all ({filtered.length})
+                </button>
+              )}
               <button
-                onClick={() => {
-                  if (filtered.length > 50) {
-                    if (!window.confirm(`Add all ${filtered.length} filtered contacts to route?`)) return;
-                  }
-                  addMultipleStops(filtered);
-                }}
-                className="flex w-full items-center justify-center gap-1.5 rounded-md border border-gray-200 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
+                onClick={() => setImportOpen(true)}
+                className="flex items-center justify-center gap-1.5 rounded-md border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"
               >
-                <ListPlus className="h-3.5 w-3.5" />
-                Add all ({filtered.length})
+                <FileUp className="h-3.5 w-3.5" />
+                Import
               </button>
-            )}
+            </div>
           </div>
 
           {/* Stop list */}
@@ -175,6 +186,13 @@ export function RouteBuilder() {
           settings={settings}
         />
       </div>
+
+      {importOpen && (
+        <ImportStopsModal
+          onClose={() => setImportOpen(false)}
+          onImport={(contacts) => addMultipleStops(contacts)}
+        />
+      )}
     </div>
   );
 }

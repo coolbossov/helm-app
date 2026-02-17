@@ -8,6 +8,18 @@ import type { ContactMarkerData } from "@/types";
 import type { MapSettings } from "@/lib/hooks/use-map-settings";
 import { Spinner } from "@/components/ui";
 
+interface AutoPlanPins {
+  start?: { lat: number; lng: number };
+  end?: { lat: number; lng: number };
+}
+
+interface PlaceMarker {
+  place_id: string;
+  name: string;
+  lat: number;
+  lng: number;
+}
+
 interface GoogleMapViewProps {
   contacts: ContactMarkerData[];
   onMarkerClick: (contact: ContactMarkerData) => void;
@@ -15,6 +27,10 @@ interface GoogleMapViewProps {
   settings: MapSettings;
   coverageMap?: Map<string, Date>;
   simplified?: boolean;
+  onMapClick?: (lat: number, lng: number) => void;
+  autoPlanPins?: AutoPlanPins;
+  placeMarkers?: PlaceMarker[];
+  onPlaceClick?: (place: PlaceMarker) => void;
 }
 
 function getCoverageRing(contactId: string, coverageMap: Map<string, Date>): string {
@@ -101,6 +117,10 @@ export function GoogleMapView({
   selectedId,
   settings,
   coverageMap,
+  onMapClick,
+  autoPlanPins,
+  placeMarkers,
+  onPlaceClick,
 }: GoogleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { map, ready, error } = useMap(containerRef);
@@ -108,6 +128,9 @@ export function GoogleMapView({
   const clustererRef = useRef<MarkerClusterer | null>(null);
   const pinElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
   const selectedIdRef = useRef<string | null>(null);
+  const autoPlanMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const placeMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   // Track zoom for Option A scaling
   const zoomListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
@@ -245,6 +268,120 @@ export function GoogleMapView({
 
     selectedIdRef.current = selectedId;
   }, [selectedId]);
+
+  // Map click handler for auto-plan mode
+  useEffect(() => {
+    if (!map || !ready) return;
+    if (mapClickListenerRef.current) {
+      mapClickListenerRef.current.remove();
+      mapClickListenerRef.current = null;
+    }
+    if (onMapClick) {
+      mapClickListenerRef.current = map.addListener(
+        "click",
+        (e: google.maps.MapMouseEvent) => {
+          if (e.latLng) onMapClick(e.latLng.lat(), e.latLng.lng());
+        }
+      );
+    }
+    return () => {
+      if (mapClickListenerRef.current) {
+        mapClickListenerRef.current.remove();
+        mapClickListenerRef.current = null;
+      }
+    };
+  }, [map, ready, onMapClick]);
+
+  // Auto-plan start/end pins
+  useEffect(() => {
+    if (!map || !ready) return;
+    autoPlanMarkersRef.current.forEach((m) => (m.map = null));
+    autoPlanMarkersRef.current = [];
+
+    if (!autoPlanPins) return;
+
+    const makePin = (color: string, label: string) => {
+      const el = document.createElement("div");
+      el.style.width = "24px";
+      el.style.height = "24px";
+      el.style.borderRadius = "50%";
+      el.style.backgroundColor = color;
+      el.style.border = "3px solid white";
+      el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.4)";
+      el.style.display = "flex";
+      el.style.alignItems = "center";
+      el.style.justifyContent = "center";
+      el.style.fontSize = "10px";
+      el.style.fontWeight = "800";
+      el.style.color = "white";
+      el.textContent = label;
+      return el;
+    };
+
+    if (autoPlanPins.start) {
+      const m = new google.maps.marker.AdvancedMarkerElement({
+        position: autoPlanPins.start,
+        content: makePin("#16a34a", "S"),
+        title: "Start",
+        map,
+      });
+      autoPlanMarkersRef.current.push(m);
+    }
+    if (autoPlanPins.end) {
+      const m = new google.maps.marker.AdvancedMarkerElement({
+        position: autoPlanPins.end,
+        content: makePin("#dc2626", "E"),
+        title: "End",
+        map,
+      });
+      autoPlanMarkersRef.current.push(m);
+    }
+
+    return () => {
+      autoPlanMarkersRef.current.forEach((m) => (m.map = null));
+      autoPlanMarkersRef.current = [];
+    };
+  }, [map, ready, autoPlanPins]);
+
+  // Place search markers (orange diamonds)
+  useEffect(() => {
+    if (!map || !ready) return;
+    placeMarkersRef.current.forEach((m) => (m.map = null));
+    placeMarkersRef.current = [];
+
+    if (!placeMarkers || placeMarkers.length === 0) return;
+
+    const newMarkers = placeMarkers.map((place) => {
+      const el = document.createElement("div");
+      el.style.width = "14px";
+      el.style.height = "14px";
+      el.style.backgroundColor = "#f97316";
+      el.style.border = "2px solid white";
+      el.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
+      el.style.transform = "rotate(45deg)";
+      el.style.cursor = "pointer";
+
+      const marker = new google.maps.marker.AdvancedMarkerElement({
+        position: { lat: place.lat, lng: place.lng },
+        content: el,
+        title: place.name,
+        map,
+      });
+
+      if (onPlaceClick) {
+        marker.addListener("click", () => onPlaceClick(place));
+      }
+
+      return marker;
+    });
+
+    placeMarkersRef.current = newMarkers;
+
+    return () => {
+      placeMarkersRef.current.forEach((m) => (m.map = null));
+      placeMarkersRef.current = [];
+    };
+  }, [map, ready, placeMarkers, onPlaceClick]);
 
   if (error) {
     return (

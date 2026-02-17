@@ -7,6 +7,11 @@ const patchStopSchema = z.object({
   status: z.enum(["pending", "visited", "skipped"]).optional(),
   visit_notes: z.string().max(1000).nullable().optional(),
   stop_order: z.number().int().min(0).optional(),
+  priority: z.enum(["must_visit", "nice_to_visit"]).optional(),
+  time_window_start: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable().optional(),
+  time_window_end: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable().optional(),
+  expected_duration_min: z.number().int().min(1).max(480).optional(),
+  visit_outcome: z.string().max(100).nullable().optional(),
 });
 
 type Params = { params: Promise<{ id: string; stopId: string }> };
