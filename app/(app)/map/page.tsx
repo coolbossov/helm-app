@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, Wand2 } from "lucide-react";
+import { Filter, Wand2, Eye } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
 import { FilterPanel } from "@/components/map/filter-panel";
 import { ContactDetail } from "@/components/map/contact-detail";
@@ -10,12 +10,12 @@ import { SearchBar } from "@/components/map/search-bar";
 import { MapStats } from "@/components/map/map-stats";
 import { MapSettingsButton } from "@/components/map/map-settings";
 import { CoverageLegend } from "@/components/map/coverage-legend";
+import { VisitStatusLegend } from "@/components/map/visit-status-legend";
 import { PlacesSearchBar } from "@/components/map/places-search-bar";
 import { AddPlaceModal } from "@/components/map/add-place-modal";
 import { BottomSheet, Spinner } from "@/components/ui";
 import { useContacts, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
-import { useCoverage } from "@/lib/hooks/use-coverage";
 import { usePlacesSearch } from "@/lib/hooks/use-places-search";
 import { contactsInCorridor } from "@/lib/utils/geo";
 import type { ContactMarkerData } from "@/types";
@@ -31,7 +31,6 @@ export default function MapPage() {
   const { filters, filtered, updateFilter, resetFilters, activeFilterCount } =
     useFilters(markers);
   const { settings, updateSetting } = useMapSettings();
-  const { coverageMap } = useCoverage(settings.coverageOverlay);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -228,6 +227,19 @@ export default function MapPage() {
             <Wand2 className="h-4 w-4" />
           </button>
 
+          {/* Visit color mode toggle */}
+          <button
+            onClick={() => updateSetting("visitColorMode", !settings.visitColorMode)}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
+              settings.visitColorMode
+                ? "border-green-500 bg-green-600 text-white"
+                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+            title={settings.visitColorMode ? "Showing visit status colors" : "Show visit status colors"}
+          >
+            <Eye className="h-4 w-4" />
+          </button>
+
           {/* Map settings */}
           <MapSettingsButton settings={settings} onChange={updateSetting} />
         </div>
@@ -267,8 +279,13 @@ export default function MapPage() {
           </button>
         </div>
 
-        {/* Coverage legend */}
-        {settings.coverageOverlay && (
+        {/* Legend: visit status or coverage overlay */}
+        {settings.visitColorMode && (
+          <div className="absolute bottom-20 right-3 z-10 sm:bottom-4 sm:right-4">
+            <VisitStatusLegend />
+          </div>
+        )}
+        {!settings.visitColorMode && settings.coverageOverlay && (
           <div className="absolute bottom-20 right-3 z-10 sm:bottom-4 sm:right-4">
             <CoverageLegend />
           </div>
@@ -280,7 +297,6 @@ export default function MapPage() {
           onMarkerClick={handleMarkerClick}
           selectedId={selectedId}
           settings={settings}
-          coverageMap={coverageMap}
           onMapClick={autoPlanActive ? handleMapClickWrapper : undefined}
           autoPlanPins={
             autoPlanActive

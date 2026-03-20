@@ -9,7 +9,8 @@ export async function GET(request: NextRequest) {
   let query = supabase.from("synced_contacts").select(
     `id, zoho_id, last_name, first_name, account_name,
      latitude, longitude, business_type, priority,
-     lifecycle_stage, contacting_status`
+     lifecycle_stage, contacting_status,
+     visit_status, last_visit_date`
   );
 
   // Filters
@@ -32,6 +33,21 @@ export async function GET(request: NextRequest) {
   const status = searchParams.get("contacting_status");
   if (status) {
     query = query.in("contacting_status", status.split(","));
+  }
+
+  const visitStatus = searchParams.get("visit_status");
+  if (visitStatus) {
+    query = query.in("visit_status", visitStatus.split(","));
+  }
+
+  // Filter by overdue: not visited in X days
+  const overdueDays = searchParams.get("overdue_days");
+  if (overdueDays) {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - parseInt(overdueDays, 10));
+    query = query.or(
+      `last_visit_date.is.null,last_visit_date.lte.${cutoff.toISOString().split("T")[0]}`
+    );
   }
 
   const search = searchParams.get("search");

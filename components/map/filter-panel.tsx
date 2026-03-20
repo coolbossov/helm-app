@@ -3,7 +3,8 @@
 import { X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import type { ContactFilters, Priority, LifecycleStage, ContactingStatus } from "@/types";
+import { VISIT_STATUS_COLORS } from "@/types";
+import type { ContactFilters, Priority, LifecycleStage, ContactingStatus, VisitStatus } from "@/types";
 
 const BUSINESS_TYPES = ["Dance", "School", "Daycare", "Cheer", "Sports", "Other"];
 const PRIORITIES: Priority[] = [
@@ -28,6 +29,22 @@ const CONTACTING_STATUSES: ContactingStatus[] = [
   "Follow Up",
   "Not Interested",
   "Closed",
+];
+
+const VISIT_STATUSES: VisitStatus[] = [
+  "Never Visited",
+  "Visited Recently",
+  "Needs Follow-up",
+  "Hot Lead",
+  "Not Interested",
+  "Closed Won",
+];
+
+const OVERDUE_OPTIONS = [
+  { label: "Not visited in 30+ days", days: 30 },
+  { label: "Not visited in 60+ days", days: 60 },
+  { label: "Not visited in 90+ days", days: 90 },
+  { label: "Not visited in 180+ days", days: 180 },
 ];
 
 interface FilterPanelProps {
@@ -150,6 +167,64 @@ export function FilterPanel({
           selected={filters.contacting_statuses}
           onChange={(v) => onUpdate("contacting_statuses", v)}
         />
+
+        {/* Visit Status filter */}
+        <div>
+          <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+            Visit Status
+          </h4>
+          <div className="space-y-1">
+            {VISIT_STATUSES.map((status) => (
+              <label
+                key={status}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50"
+              >
+                <input
+                  type="checkbox"
+                  checked={filters.visit_statuses.includes(status)}
+                  onChange={() => {
+                    const next = filters.visit_statuses.includes(status)
+                      ? filters.visit_statuses.filter((v) => v !== status)
+                      : [...filters.visit_statuses, status];
+                    onUpdate("visit_statuses", next);
+                  }}
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span
+                  className="h-2.5 w-2.5 rounded-full shrink-0"
+                  style={{ backgroundColor: VISIT_STATUS_COLORS[status] }}
+                />
+                <span className="text-sm text-gray-700">{status}</span>
+              </label>
+            ))}
+          </div>
+        </div>
+
+        {/* Overdue filter */}
+        <div>
+          <h4 className="mb-2 text-xs font-semibold tracking-wide text-gray-500 uppercase">
+            Overdue Visits
+          </h4>
+          <div className="space-y-1">
+            {OVERDUE_OPTIONS.map(({ label, days }) => (
+              <label
+                key={days}
+                className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 hover:bg-gray-50"
+              >
+                <input
+                  type="radio"
+                  name="overdue_days"
+                  checked={filters.overdue_days === days}
+                  onChange={() =>
+                    onUpdate("overdue_days", filters.overdue_days === days ? null : days)
+                  }
+                  className="h-4 w-4 border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-sm text-gray-700">{label}</span>
+              </label>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );

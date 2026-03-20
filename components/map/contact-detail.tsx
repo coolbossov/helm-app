@@ -13,6 +13,7 @@ import {
   Plus,
   Pencil,
   Check,
+  Footprints,
 } from "lucide-react";
 import { Button, BusinessTypeBadge, Badge, Spinner } from "@/components/ui";
 import { useContactDetail } from "@/lib/hooks";
@@ -20,7 +21,7 @@ import { useActivities } from "@/lib/hooks/use-activities";
 import { ActivityTimeline } from "./activity-timeline";
 import { AddNoteForm } from "./add-note-form";
 import { formatPhone, formatAddress, getDisplayName } from "@/lib/utils";
-import { BUSINESS_TYPE_COLORS } from "@/types";
+import { BUSINESS_TYPE_COLORS, VISIT_STATUS_COLORS, type VisitStatus } from "@/types";
 
 const BUSINESS_TYPES = Object.keys(BUSINESS_TYPE_COLORS);
 
@@ -36,6 +37,9 @@ export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
   const [editingTypes, setEditingTypes] = useState(false);
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [savingTypes, setSavingTypes] = useState(false);
+  const [loggingVisit, setLoggingVisit] = useState(false);
+  const [editingVisitStatus, setEditingVisitStatus] = useState(false);
+  const [savingVisitStatus, setSavingVisitStatus] = useState(false);
 
   const startEditTypes = () => {
     setSelectedTypes(contact?.business_type ?? []);
@@ -63,6 +67,37 @@ export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
       console.error(e);
     } finally {
       setSavingTypes(false);
+    }
+  };
+
+  const logVisit = async () => {
+    if (!contactId) return;
+    setLoggingVisit(true);
+    try {
+      await addActivity({ activity_type: "visit", title: "Visit logged" });
+      refetch();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoggingVisit(false);
+    }
+  };
+
+  const updateVisitStatus = async (status: VisitStatus) => {
+    if (!contactId) return;
+    setSavingVisitStatus(true);
+    try {
+      await fetch(`/api/contacts/${contactId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ visit_status: status }),
+      });
+      setEditingVisitStatus(false);
+      refetch();
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSavingVisitStatus(false);
     }
   };
 
@@ -189,6 +224,60 @@ export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
           )}
         </div>
 
+        {/* Visit Status */}
+        <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor:
+                    VISIT_STATUS_COLORS[
+                      (contact.visit_status ?? "Never Visited") as VisitStatus
+                    ],
+                }}
+              />
+              <span className="text-sm font-medium text-gray-800">
+                {contact.visit_status ?? "Never Visited"}
+              </span>
+              {contact.last_visit_date && (
+                <span className="text-xs text-gray-400">
+                  · {new Date(contact.last_visit_date).toLocaleDateString()}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => setEditingVisitStatus((v) => !v)}
+              className="rounded p-1 text-gray-400 hover:bg-gray-200 hover:text-gray-600"
+            >
+              <Pencil className="h-3.5 w-3.5" />
+            </button>
+          </div>
+          {editingVisitStatus && (
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {(Object.keys(VISIT_STATUS_COLORS) as VisitStatus[]).map((s) => (
+                <button
+                  key={s}
+                  disabled={savingVisitStatus}
+                  onClick={() => updateVisitStatus(s)}
+                  className={`rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors ${
+                    contact.visit_status === s
+                      ? "text-white border-transparent"
+                      : "text-gray-600 border-gray-200 bg-white hover:bg-gray-100"
+                  }`}
+                  style={
+                    contact.visit_status === s
+                      ? { backgroundColor: VISIT_STATUS_COLORS[s] }
+                      : undefined
+                  }
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
         {/* Address */}
         {address && (
           <div className="flex items-start gap-2 text-sm">
@@ -287,14 +376,30 @@ export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
 
         {/* Action buttons */}
         <div className="flex flex-col gap-2 pt-2">
-          {navigateUrl && (
-            <a href={navigateUrl} target="_blank" rel="noopener noreferrer">
-              <Button className="w-full" size="lg">
-                <Navigation className="h-4 w-4" />
-                Navigate
-              </Button>
-            </a>
-          )}
+          <div className="flex gap-2">
+            {navigateUrl && (
+              <a href={navigateUrl} target="_blank" rel="noopener noreferrer" className="flex-1">
+                <Button className="w-full" size="lg">
+                  <Navigation className="h-4 w-4" />
+                  Navigate
+                </Button>
+              </a>
+            )}
+            <Button
+              onClick={logVisit}
+              disabled={loggingVisit}
+              size="lg"
+              variant="secondary"
+              className="shrink-0 gap-1.5 bg-green-50 text-green-700 border-green-200 hover:bg-green-100"
+            >
+              {loggingVisit ? (
+                <Spinner />
+              ) : (
+                <Footprints className="h-4 w-4" />
+              )}
+              {navigateUrl ? "" : "Log Visit"}
+            </Button>
+          </div>
           <div className="flex gap-2">
             <a
               href={zohoUrl}

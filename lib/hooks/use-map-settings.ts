@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 
 export interface MapSettings {
-  outlinedMarkers: boolean; // Option A: dark outline + zoom scale
-  pinMarkers: boolean;      // Option B: SVG teardrop pins
-  simplifiedMap: boolean;   // Option C: muted CSS filter on map
-  coverageOverlay: boolean; // Color rings by visit recency
+  outlinedMarkers: boolean;  // Option A: dark outline + zoom scale
+  pinMarkers: boolean;       // Option B: SVG teardrop pins
+  simplifiedMap: boolean;    // Option C: muted CSS filter on map
+  coverageOverlay: boolean;  // Color rings by visit recency
+  visitColorMode: boolean;   // Color pins by visit_status instead of business type
 }
 
 const STORAGE_KEY = "sapd-map-settings";
@@ -16,6 +17,7 @@ const DEFAULT_SETTINGS: MapSettings = {
   pinMarkers: false,
   simplifiedMap: false,
   coverageOverlay: false,
+  visitColorMode: false,
 };
 
 export function useMapSettings() {

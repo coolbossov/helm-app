@@ -62,6 +62,8 @@ export async function syncAllContacts(): Promise<{
     const batch = contacts.slice(i, i + 50);
     const rows = batch.map(contactToRow);
 
+    // visit_status and last_visit_date are NOT in contactToRow() — they're app-managed
+    // and will not be overwritten by Bigin syncs
     const { data, error } = await supabase
       .from("synced_contacts")
       .upsert(rows, { onConflict: "zoho_id" })

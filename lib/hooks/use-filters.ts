@@ -8,6 +8,8 @@ const INITIAL_FILTERS: ContactFilters = {
   priorities: [],
   lifecycle_stages: [],
   contacting_statuses: [],
+  visit_statuses: [],
+  overdue_days: null,
   search: "",
 };
 
@@ -47,6 +49,22 @@ export function useFilters(markers: ContactMarkerData[]) {
           return false;
       }
 
+      // Visit status filter
+      if (filters.visit_statuses.length > 0) {
+        const status = m.visit_status ?? "Never Visited";
+        if (!filters.visit_statuses.includes(status)) return false;
+      }
+
+      // Overdue filter: not visited in X days
+      if (filters.overdue_days !== null) {
+        if (m.last_visit_date) {
+          const daysSince =
+            (Date.now() - new Date(m.last_visit_date).getTime()) / 86400000;
+          if (daysSince < filters.overdue_days) return false;
+        }
+        // contacts with no visit date always pass the overdue filter (never visited)
+      }
+
       // Search filter
       if (filters.search) {
         const q = filters.search.toLowerCase();
@@ -75,6 +93,8 @@ export function useFilters(markers: ContactMarkerData[]) {
     if (filters.priorities.length) count++;
     if (filters.lifecycle_stages.length) count++;
     if (filters.contacting_statuses.length) count++;
+    if (filters.visit_statuses.length) count++;
+    if (filters.overdue_days !== null) count++;
     return count;
   }, [filters]);
 

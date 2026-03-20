@@ -31,6 +31,14 @@ export type ContactingStatus =
 
 export type GeocodeStatus = "pending" | "success" | "failed" | "no_address";
 
+export type VisitStatus =
+  | "Never Visited"
+  | "Visited Recently"
+  | "Needs Follow-up"
+  | "Hot Lead"
+  | "Not Interested"
+  | "Closed Won";
+
 export interface SyncedContact {
   id: string;
   zoho_id: string;
@@ -57,6 +65,9 @@ export interface SyncedContact {
   lifecycle_stage: LifecycleStage | null;
   contacting_status: ContactingStatus | null;
 
+  visit_status: VisitStatus | null;
+  last_visit_date: string | null; // ISO date string YYYY-MM-DD
+
   contacting_tips: string | null;
   prospecting_notes: string | null;
 
@@ -78,6 +89,8 @@ export interface ContactMarkerData {
   priority: Priority | null;
   lifecycle_stage: LifecycleStage | null;
   contacting_status: ContactingStatus | null;
+  visit_status: VisitStatus | null;
+  last_visit_date: string | null;
 }
 
 export interface ContactFilters {
@@ -85,6 +98,8 @@ export interface ContactFilters {
   priorities: Priority[];
   lifecycle_stages: LifecycleStage[];
   contacting_statuses: ContactingStatus[];
+  visit_statuses: VisitStatus[];
+  overdue_days: number | null; // filter: not visited in X days
   search: string;
 }
 
@@ -93,6 +108,8 @@ export const DEFAULT_FILTERS: ContactFilters = {
   priorities: [],
   lifecycle_stages: [],
   contacting_statuses: [],
+  visit_statuses: [],
+  overdue_days: null,
   search: "",
 };
 
@@ -104,3 +121,22 @@ export const BUSINESS_TYPE_COLORS: Record<string, string> = {
   Sports: "#f97316",
   Other: "#6b7280",
 };
+
+/** Pin fill color by visit status (used when map is in "visit mode") */
+export const VISIT_STATUS_COLORS: Record<VisitStatus, string> = {
+  "Never Visited":    "#6b7280", // gray
+  "Visited Recently": "#22c55e", // green
+  "Needs Follow-up":  "#eab308", // yellow
+  "Hot Lead":         "#3b82f6", // blue
+  "Not Interested":   "#ef4444", // red
+  "Closed Won":       "#a855f7", // purple
+};
+
+/** Ring/border color derived from recency (days since last visit) */
+export function getVisitRecencyColor(lastVisitDate: string | null): string {
+  if (!lastVisitDate) return "#ef4444"; // red — never visited
+  const days = (Date.now() - new Date(lastVisitDate).getTime()) / 86400000;
+  if (days <= 30) return "#22c55e";  // green — recent
+  if (days <= 90) return "#eab308";  // yellow — follow-up needed
+  return "#ef4444";                   // red — overdue
+}

@@ -3,7 +3,7 @@
 import { useRef, useEffect } from "react";
 import { MarkerClusterer, SuperClusterAlgorithm } from "@googlemaps/markerclusterer";
 import { useMap } from "@/lib/hooks/use-map";
-import { BUSINESS_TYPE_COLORS, CLUSTER_MAX_ZOOM } from "@/types";
+import { BUSINESS_TYPE_COLORS, VISIT_STATUS_COLORS, getVisitRecencyColor, CLUSTER_MAX_ZOOM } from "@/types";
 import type { ContactMarkerData } from "@/types";
 import type { MapSettings } from "@/lib/hooks/use-map-settings";
 import { Spinner } from "@/components/ui";
@@ -25,7 +25,6 @@ interface GoogleMapViewProps {
   onMarkerClick: (contact: ContactMarkerData) => void;
   selectedId: string | null;
   settings: MapSettings;
-  coverageMap?: Map<string, Date>;
   simplified?: boolean;
   onMapClick?: (lat: number, lng: number) => void;
   autoPlanPins?: AutoPlanPins;
@@ -33,16 +32,15 @@ interface GoogleMapViewProps {
   onPlaceClick?: (place: PlaceMarker) => void;
 }
 
-function getCoverageRing(contactId: string, coverageMap: Map<string, Date>): string {
-  const visited = coverageMap.get(contactId);
-  if (!visited) return "#ef4444"; // red — never visited
-  const days = (Date.now() - visited.getTime()) / 86400000;
-  if (days <= 30) return "#22c55e"; // green
-  if (days <= 90) return "#eab308"; // yellow
-  return "#ef4444"; // red
+function getCoverageRing(contact: ContactMarkerData): string {
+  return getVisitRecencyColor(contact.last_visit_date);
 }
 
-function getMarkerColor(contact: ContactMarkerData): string {
+function getMarkerColor(contact: ContactMarkerData, visitColorMode: boolean): string {
+  if (visitColorMode) {
+    const status = contact.visit_status ?? "Never Visited";
+    return VISIT_STATUS_COLORS[status] ?? VISIT_STATUS_COLORS["Never Visited"];
+  }
   const type = contact.business_type[0];
   return type ? (BUSINESS_TYPE_COLORS[type] || BUSINESS_TYPE_COLORS.Other) : BUSINESS_TYPE_COLORS.Other;
 }
@@ -79,7 +77,7 @@ function createCircleMarker(
   contact: ContactMarkerData,
   settings: MapSettings
 ): HTMLDivElement {
-  const color = getMarkerColor(contact);
+  const color = getMarkerColor(contact, settings.visitColorMode);
   const size = getMarkerSize(contact);
 
   const pin = document.createElement("div");
@@ -100,8 +98,8 @@ function createCircleMarker(
   return pin;
 }
 
-function createPinMarker(contact: ContactMarkerData): HTMLDivElement {
-  const color = getMarkerColor(contact);
+function createPinMarker(contact: ContactMarkerData, visitColorMode: boolean): HTMLDivElement {
+  const color = getMarkerColor(contact, visitColorMode);
   const size = getMarkerSize(contact);
 
   const wrapper = document.createElement("div");
@@ -116,7 +114,6 @@ export function GoogleMapView({
   onMarkerClick,
   selectedId,
   settings,
-  coverageMap,
   onMapClick,
   autoPlanPins,
   placeMarkers,
@@ -151,12 +148,12 @@ export function GoogleMapView({
 
     const newMarkers = contacts.map((contact) => {
       const pin = settings.pinMarkers
-        ? createPinMarker(contact)
+        ? createPinMarker(contact, settings.visitColorMode)
         : createCircleMarker(contact, settings);
 
       // Apply coverage ring overlay
-      if (settings.coverageOverlay && coverageMap && !settings.pinMarkers) {
-        const ringColor = getCoverageRing(contact.id, coverageMap);
+      if (settings.coverageOverlay && !settings.pinMarkers) {
+        const ringColor = getCoverageRing(contact);
         pin.style.boxShadow = `0 0 0 3px ${ringColor}, 0 2px 4px rgba(0,0,0,0.3)`;
       }
 
@@ -244,7 +241,7 @@ export function GoogleMapView({
         zoomListenerRef.current = null;
       }
     };
-  }, [map, ready, contacts, onMarkerClick, settings, coverageMap]);
+  }, [map, ready, contacts, onMarkerClick, settings]);
 
   // Update only the affected pins when selection changes
   useEffect(() => {

@@ -9,6 +9,16 @@ const patchSchema = z.object({
   priority: z.enum(["High Priority", "Medium Priority", "Low Priority", "Warm Priority", "Hot Priority"]).optional(),
   contacting_tips: z.string().max(2000).optional(),
   business_type: z.array(z.enum(["Dance", "School", "Daycare", "Cheer", "Sports", "Other"])).optional(),
+  // Visit tracking fields — Supabase-only, not synced to Bigin
+  visit_status: z.enum([
+    "Never Visited",
+    "Visited Recently",
+    "Needs Follow-up",
+    "Hot Lead",
+    "Not Interested",
+    "Closed Won",
+  ]).optional(),
+  last_visit_date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
 });
 
 export async function GET(
@@ -82,8 +92,11 @@ export async function PATCH(
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Queue field update for Zoho sync (exclude HELM-only fields)
-  const { business_type: _bt, ...biginFields } = updates as Record<string, unknown> & { business_type?: unknown };
+  // Queue field update for Zoho sync — exclude fields that only live in Supabase
+  const SUPABASE_ONLY_FIELDS = new Set(["business_type", "visit_status", "last_visit_date"]);
+  const biginFields = Object.fromEntries(
+    Object.entries(updates).filter(([k]) => !SUPABASE_ONLY_FIELDS.has(k))
+  );
   if (Object.keys(biginFields).length > 0) {
     await admin.from("field_updates").insert({
       contact_id: id,
@@ -93,7 +106,7 @@ export async function PATCH(
   }
 
   // Auto-log status_change activity for key field changes
-  const statusFields = ["lifecycle_stage", "contacting_status", "priority"];
+  const statusFields = ["lifecycle_stage", "contacting_status", "priority", "visit_status"];
   for (const field of statusFields) {
     if (updates[field] !== undefined) {
       await admin.from("contact_activities").insert({
