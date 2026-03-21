@@ -8,10 +8,11 @@ export async function getAccessToken(): Promise<string> {
     return cachedToken.accessToken;
   }
 
+  // BIGIN_* is the new standard; ZOHO_BIGIN_* kept for backwards compatibility during transition
   const params = new URLSearchParams({
-    refresh_token: process.env.ZOHO_BIGIN_REFRESH_TOKEN!,
-    client_id: process.env.ZOHO_BIGIN_CLIENT_ID!,
-    client_secret: process.env.ZOHO_BIGIN_CLIENT_SECRET!,
+    refresh_token: (process.env.BIGIN_REFRESH_TOKEN || process.env.ZOHO_BIGIN_REFRESH_TOKEN)!,
+    client_id: (process.env.BIGIN_CLIENT_ID || process.env.ZOHO_BIGIN_CLIENT_ID)!,
+    client_secret: (process.env.BIGIN_CLIENT_SECRET || process.env.ZOHO_BIGIN_CLIENT_SECRET)!,
     grant_type: "refresh_token",
   });
 

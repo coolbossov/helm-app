@@ -7,31 +7,54 @@ import type { ZohoContact, ZohoMultiselect } from "@/types";
  */
 
 const BUSINESS_TYPE_MAP: Record<string, string> = {
+  // Maps Bigin actual_value → short display label for the HELM app
+  // Current values (post-2026-03-20 restructure)
   "School Picture Day": "School",
+  "Dance": "Dance",
+  "Gymnastics": "Gymnastics",
+  "Cheer": "Cheer",
+  "Daycare Picture Day": "Daycare",
+  "Sports": "Sports",
+  "Martial Arts": "Martial Arts",
+  "Performing Arts": "Performing Arts",
+  "Senior Living": "Senior Living",
+  "Family Photoshoot": "Family",
+  "Mini Sessions": "Mini",
+  "Headshots": "Headshots",
+  "Event": "Event",
+  "Photo booth": "Photo Booth",
+  "Media Day": "Media Day",
+  "Product": "Product",
+  "Other": "Other",
+  // Legacy values (pre-restructure) — kept for backwards compatibility
   "Dance Studio Picture Day": "Dance",
   "Daycare/Preschool Picture Day": "Daycare",
   "Cheer Picture Day": "Cheer",
   "Sports Picture Day": "Sports",
-  // Fallback: if display_value already short, use it directly
 };
 
 const LIFECYCLE_STAGE_MAP: Record<string, string> = {
-  // Common Bigin values
-  "New Prospect": "Lead",
-  "Enriched": "Lead",
-  "Lead-Not Yet Contacted": "Lead",
-  "Lead-Contacted": "Contacted",
-  "Lead-Qualified": "Qualified",
-  "Proposal/Quote Sent": "Proposal",
-  "Active Customer": "Customer",
-  "Churned/Lost": "Churned",
-  // Pass through values that already match
-  "Lead": "Lead",
+  // Current canonical values (post-2026-03-20 restructure)
+  "New": "New",
   "Contacted": "Contacted",
+  "Engaged": "Engaged",
   "Qualified": "Qualified",
-  "Proposal": "Proposal",
   "Customer": "Customer",
   "Churned": "Churned",
+  "Do Not Contact": "Do Not Contact",
+  // Legacy values (pre-restructure) — kept for backwards compatibility
+  "New Prospect": "New",
+  "Lead Enriched": "Contacted",
+  "Enriched": "Contacted",
+  "Lead": "Contacted",
+  "Warm Lead": "Engaged",
+  "Prospect": "New",
+  "Lead-Not Yet Contacted": "New",
+  "Lead-Contacted": "Contacted",
+  "Lead-Qualified": "Qualified",
+  "Proposal/Quote Sent": "Qualified",
+  "Active Customer": "Customer",
+  "Churned/Lost": "Churned",
 };
 
 export function mapBusinessTypes(

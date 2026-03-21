@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { updateContact as updateBiginContact } from "@/lib/zoho/client";
 
 const patchSchema = z.object({
   lifecycle_stage: z.enum(["Lead", "Contacted", "Qualified", "Proposal", "Customer", "Churned"]).optional(),
@@ -116,6 +117,20 @@ export async function PATCH(
         title: `${field.replace(/_/g, " ")} changed to ${updates[field]}`,
         metadata: { field, new_value: updates[field] },
       });
+    }
+  }
+
+  // Automation 6: When a visit is logged in HELM, sync Last_Meeting_Date to Bigin
+  // This fires when last_visit_date is set (onsite visit recorded by the field sales team)
+  if (updates.last_visit_date && data?.zoho_id) {
+    try {
+      await updateBiginContact(data.zoho_id, {
+        Last_Meeting_Date: updates.last_visit_date as string,
+        Last_Meeting_Notes: `[HELM visit logged ${updates.last_visit_date}]`,
+      });
+    } catch (err) {
+      // Non-fatal: log but don't fail the response — Supabase update already succeeded
+      console.error("[HELM] Failed to update Bigin Last_Meeting_Date:", err);
     }
   }
 
