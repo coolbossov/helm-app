@@ -32,6 +32,8 @@ interface GoogleMapViewProps {
   onPlaceClick?: (place: PlaceMarker) => void;
   /** IDs of contacts added to the route builder — rendered with a numbered overlay */
   routeStopIds?: string[];
+  /** Fires on map idle with the current center — used by Discover panel */
+  onCenterChange?: (center: { lat: number; lng: number }) => void;
 }
 
 function getCoverageRing(contact: ContactMarkerData): string {
@@ -121,6 +123,7 @@ export function GoogleMapView({
   placeMarkers,
   onPlaceClick,
   routeStopIds = [],
+  onCenterChange,
 }: GoogleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { map, ready, error } = useMap(containerRef);
@@ -293,6 +296,16 @@ export function GoogleMapView({
       }
     };
   }, [map, ready, onMapClick]);
+
+  // Fire map center to parent on map idle (for Discover panel)
+  useEffect(() => {
+    if (!map || !ready || !onCenterChange) return;
+    const listener = map.addListener("idle", () => {
+      const c = map.getCenter();
+      if (c) onCenterChange({ lat: c.lat(), lng: c.lng() });
+    });
+    return () => listener.remove();
+  }, [map, ready, onCenterChange]);
 
   // Auto-plan start/end pins
   useEffect(() => {

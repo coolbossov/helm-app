@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, Wand2, Eye, Route } from "lucide-react";
+import { Filter, Wand2, Eye, Route, Telescope } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
 import { FilterPanel } from "@/components/map/filter-panel";
 import { ContactDetail } from "@/components/map/contact-detail";
@@ -11,15 +11,15 @@ import { MapStats } from "@/components/map/map-stats";
 import { MapSettingsButton } from "@/components/map/map-settings";
 import { CoverageLegend } from "@/components/map/coverage-legend";
 import { VisitStatusLegend } from "@/components/map/visit-status-legend";
-import { PlacesSearchBar } from "@/components/map/places-search-bar";
-import { AddPlaceModal } from "@/components/map/add-place-modal";
 import { RouteBuilder } from "@/components/map/route-builder";
+import { DiscoverPanel } from "@/components/map/discover-panel";
 import { BottomSheet, Spinner } from "@/components/ui";
 import { useContacts, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
-import { usePlacesSearch } from "@/lib/hooks/use-places-search";
 import { contactsInCorridor } from "@/lib/utils/geo";
+import { SA_CENTER } from "@/types/maps";
 import type { ContactMarkerData } from "@/types";
+import type { DiscoveryResult } from "@/app/api/leads/discover/route";
 
 interface LatLng {
   lat: number;
@@ -44,10 +44,11 @@ export default function MapPage() {
   const [autoPlanEnd, setAutoPlanEnd] = useState<LatLng | null>(null);
   const [autoPlanLoading, setAutoPlanLoading] = useState(false);
 
-  // Places search state
-  const [placesMode, setPlacesMode] = useState(false);
-  const { results: placeResults, search: searchPlaces, clear: clearPlaces, loading: placesLoading } = usePlacesSearch();
-  const [selectedPlace, setSelectedPlace] = useState<{ place_id: string; name: string; lat: number; lng: number; formatted_address?: string; phone?: string } | null>(null);
+  // Discover panel state
+  const [discoverOpen, setDiscoverOpen] = useState(false);
+  const [discoverMobileOpen, setDiscoverMobileOpen] = useState(false);
+  const [discoveryResults, setDiscoveryResults] = useState<DiscoveryResult[]>([]);
+  const [mapCenter, setMapCenter] = useState(SA_CENTER);
 
   // Route builder state
   const [routeBuilderOpen, setRouteBuilderOpen] = useState(false);
@@ -154,9 +155,19 @@ export default function MapPage() {
     }
   };
 
-  const togglePlacesMode = () => {
-    setPlacesMode((v) => !v);
-    if (placesMode) clearPlaces();
+  const openDiscover = () => {
+    if (window.innerWidth < 640) {
+      setDiscoverMobileOpen(true);
+    } else {
+      setDiscoverOpen(true);
+      setSelectedId(null);
+    }
+  };
+
+  const closeDiscover = () => {
+    setDiscoverOpen(false);
+    setDiscoverMobileOpen(false);
+    setDiscoveryResults([]);
   };
 
   // Route builder helpers
@@ -267,10 +278,27 @@ export default function MapPage() {
     />
   );
 
+  // Discovery results as placeMarkers for the map (same shape: place_id, name, lat, lng)
+  const discoveryPlaceMarkers = discoveryResults.map((r) => ({
+    place_id: r.place_id,
+    name: r.name,
+    lat: r.lat,
+    lng: r.lng,
+  }));
+
+  const discoverPanel = (
+    <DiscoverPanel
+      center={mapCenter}
+      onClose={closeDiscover}
+      onLeadAdded={refetch}
+      onResultsChange={setDiscoveryResults}
+    />
+  );
+
   return (
     <div className="relative flex h-full">
       {/* Desktop filter panel */}
-      {filterOpen && !routeBuilderOpen && (
+      {filterOpen && !routeBuilderOpen && !discoverOpen && (
         <div className="hidden w-[280px] shrink-0 border-r border-gray-200 sm:block">
           <FilterPanel
             filters={filters}
@@ -313,6 +341,19 @@ export default function MapPage() {
             onChange={(v) => updateFilter("search", v)}
             className="flex-1"
           />
+
+          {/* Discover toggle */}
+          <button
+            onClick={openDiscover}
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
+              discoverOpen || discoverMobileOpen
+                ? "border-orange-500 bg-orange-500 text-white"
+                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+            title="Discover nearby leads"
+          >
+            <Telescope className="h-4 w-4" />
+          </button>
 
           {/* Route builder toggle */}
           <button
@@ -380,28 +421,18 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Places search bar */}
-        {placesMode && (
-          <div className="absolute top-16 left-3 right-3 z-10 sm:top-[72px] sm:left-4 sm:right-4">
-            <PlacesSearchBar onSearch={searchPlaces} loading={placesLoading} />
+        {/* Discover mode hint banner */}
+        {(discoverOpen || discoverMobileOpen) && discoveryResults.length > 0 && (
+          <div className="absolute top-16 left-1/2 z-10 -translate-x-1/2 rounded-full bg-orange-500 px-4 py-2 text-xs font-medium text-white shadow-lg sm:top-[72px]">
+            {discoveryResults.length} results — orange pins on map
           </div>
         )}
 
-        {/* Stats badge + Places toggle */}
-        <div className="absolute bottom-20 left-3 z-10 flex items-center gap-2 sm:bottom-4 sm:left-4">
+        {/* Stats badge */}
+        <div className="absolute bottom-20 left-3 z-10 sm:bottom-4 sm:left-4">
           <div className="rounded-lg bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
             <MapStats total={markers.length} visible={filtered.length} />
           </div>
-          <button
-            onClick={togglePlacesMode}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium shadow-sm backdrop-blur-sm transition-colors ${
-              placesMode
-                ? "bg-orange-500 text-white"
-                : "bg-white/90 text-gray-600 hover:bg-white"
-            }`}
-          >
-            {placesMode ? "Hide Places" : "Search Places"}
-          </button>
         </div>
 
         {/* Legend: visit status or coverage overlay */}
@@ -428,9 +459,9 @@ export default function MapPage() {
               ? { start: autoPlanStart ?? undefined, end: autoPlanEnd ?? undefined }
               : undefined
           }
-          placeMarkers={placeResults}
-          onPlaceClick={(place) => setSelectedPlace(place)}
+          placeMarkers={discoveryPlaceMarkers}
           routeStopIds={routeStopIds}
+          onCenterChange={setMapCenter}
         />
 
         {/* Empty state when filters produce 0 results */}
@@ -443,15 +474,22 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Desktop route builder panel (replaces detail when open) */}
-      {routeBuilderOpen && (
+      {/* Desktop discover panel */}
+      {discoverOpen && (
+        <div className="hidden w-[360px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
+          {discoverPanel}
+        </div>
+      )}
+
+      {/* Desktop route builder panel */}
+      {!discoverOpen && routeBuilderOpen && (
         <div className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
           {routeBuilderPanel}
         </div>
       )}
 
-      {/* Desktop detail panel (only when route builder is closed) */}
-      {!routeBuilderOpen && selectedId && (
+      {/* Desktop detail panel (only when route builder and discover are closed) */}
+      {!routeBuilderOpen && !discoverOpen && selectedId && (
         <div className="hidden w-[400px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
           <ContactDetail contactId={selectedId} onClose={handleCloseDetail} />
         </div>
@@ -474,7 +512,7 @@ export default function MapPage() {
 
       {/* Mobile detail bottom sheet */}
       <BottomSheet
-        open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen}
+        open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen && !discoverMobileOpen}
         onClose={handleCloseDetail}
         size="half"
       >
@@ -491,17 +529,15 @@ export default function MapPage() {
         {routeBuilderPanel}
       </BottomSheet>
 
-      {/* Add Place to CRM modal */}
-      {selectedPlace && (
-        <AddPlaceModal
-          place={selectedPlace}
-          onClose={() => setSelectedPlace(null)}
-          onAdded={() => {
-            setSelectedPlace(null);
-            refetch();
-          }}
-        />
-      )}
+      {/* Mobile discover bottom sheet */}
+      <BottomSheet
+        open={discoverMobileOpen}
+        onClose={closeDiscover}
+        title="Discover Leads"
+        size="full"
+      >
+        {discoverPanel}
+      </BottomSheet>
     </div>
   );
 }
