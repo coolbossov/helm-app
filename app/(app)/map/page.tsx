@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, Wand2, Eye } from "lucide-react";
+import { Filter, Wand2, Eye, Route } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
 import { FilterPanel } from "@/components/map/filter-panel";
 import { ContactDetail } from "@/components/map/contact-detail";
@@ -13,6 +13,7 @@ import { CoverageLegend } from "@/components/map/coverage-legend";
 import { VisitStatusLegend } from "@/components/map/visit-status-legend";
 import { PlacesSearchBar } from "@/components/map/places-search-bar";
 import { AddPlaceModal } from "@/components/map/add-place-modal";
+import { RouteBuilder } from "@/components/map/route-builder";
 import { BottomSheet, Spinner } from "@/components/ui";
 import { useContacts, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
@@ -48,12 +49,28 @@ export default function MapPage() {
   const { results: placeResults, search: searchPlaces, clear: clearPlaces, loading: placesLoading } = usePlacesSearch();
   const [selectedPlace, setSelectedPlace] = useState<{ place_id: string; name: string; lat: number; lng: number; formatted_address?: string; phone?: string } | null>(null);
 
+  // Route builder state
+  const [routeBuilderOpen, setRouteBuilderOpen] = useState(false);
+  const [routeBuilderMobileOpen, setRouteBuilderMobileOpen] = useState(false);
+  const [routeStops, setRouteStops] = useState<ContactMarkerData[]>([]);
+
   const handleMarkerClick = useCallback((contact: ContactMarkerData) => {
-    // Don't select contacts when in auto-plan mode (let map clicks go to auto-plan handler)
+    // Auto-plan mode: ignore marker clicks
     if (autoPlanActive) return;
+
+    // Route builder mode: toggle stop in/out
+    if (routeBuilderOpen || routeBuilderMobileOpen) {
+      setRouteStops((prev) => {
+        const exists = prev.find((s) => s.id === contact.id);
+        if (exists) return prev.filter((s) => s.id !== contact.id);
+        return [...prev, contact];
+      });
+      return;
+    }
+
     setSelectedId(contact.id);
     setMobileDetailOpen(true);
-  }, [autoPlanActive]);
+  }, [autoPlanActive, routeBuilderOpen, routeBuilderMobileOpen]);
 
   const handleSearchSelect = useCallback((contact: ContactMarkerData) => {
     setSelectedId(contact.id);
@@ -143,6 +160,72 @@ export default function MapPage() {
     if (placesMode) clearPlaces();
   };
 
+  // Route builder helpers
+  const openRouteBuilder = () => {
+    if (window.innerWidth < 640) {
+      setRouteBuilderMobileOpen(true);
+    } else {
+      setRouteBuilderOpen(true);
+      setSelectedId(null); // close contact detail on desktop
+    }
+  };
+
+  const closeRouteBuilder = () => {
+    setRouteBuilderOpen(false);
+    setRouteBuilderMobileOpen(false);
+  };
+
+  const handleRouteReorder = useCallback((from: number, to: number) => {
+    if (to < 0 || to >= routeStops.length) return;
+    setRouteStops((prev) => {
+      const next = [...prev];
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
+      return next;
+    });
+  }, [routeStops.length]);
+
+  const handleAddAllFiltered = useCallback(() => {
+    setRouteStops(filtered);
+  }, [filtered]);
+
+  const handleMarkAllVisited = useCallback(async () => {
+    await Promise.all(
+      routeStops.map((stop) =>
+        fetch(`/api/contacts/${stop.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ visit_status: "Visited Recently" }),
+        })
+      )
+    );
+    refetch();
+  }, [routeStops, refetch]);
+
+  const handleSaveRoute = useCallback(async (): Promise<string | null> => {
+    if (routeStops.length === 0) return null;
+    try {
+      const name = `Route ${new Date().toLocaleDateString()}`;
+      const res = await fetch("/api/routes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, stop_ids: routeStops.map((s) => s.id) }),
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error);
+      const routeId = json.data.id;
+      await fetch(`/api/routes/${routeId}/optimize`, { method: "POST" });
+      router.push(`/routes/${routeId}`);
+      return routeId;
+    } catch (e) {
+      console.error("Save route failed:", e);
+      return null;
+    }
+  }, [routeStops, router]);
+
+  // IDs of selected route stops for map highlighting
+  const routeStopIds = routeStops.map((s) => s.id);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -167,10 +250,24 @@ export default function MapPage() {
     );
   }
 
+  const routeBuilderPanel = (
+    <RouteBuilder
+      stops={routeStops}
+      allFiltered={filtered}
+      onRemove={(id) => setRouteStops((prev) => prev.filter((s) => s.id !== id))}
+      onReorder={handleRouteReorder}
+      onAddAll={handleAddAllFiltered}
+      onClear={() => setRouteStops([])}
+      onClose={closeRouteBuilder}
+      onMarkAllVisited={handleMarkAllVisited}
+      onSaveRoute={handleSaveRoute}
+    />
+  );
+
   return (
     <div className="relative flex h-full">
       {/* Desktop filter panel */}
-      {filterOpen && (
+      {filterOpen && !routeBuilderOpen && (
         <div className="hidden w-[280px] shrink-0 border-r border-gray-200 sm:block">
           <FilterPanel
             filters={filters}
@@ -214,6 +311,24 @@ export default function MapPage() {
             className="flex-1"
           />
 
+          {/* Route builder toggle */}
+          <button
+            onClick={openRouteBuilder}
+            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
+              routeBuilderOpen || routeBuilderMobileOpen
+                ? "border-blue-500 bg-blue-600 text-white"
+                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+            title="Build a route"
+          >
+            <Route className="h-4 w-4" />
+            {routeStops.length > 0 && !(routeBuilderOpen || routeBuilderMobileOpen) && (
+              <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
+                {routeStops.length}
+              </span>
+            )}
+          </button>
+
           {/* Auto-plan toggle */}
           <button
             onClick={toggleAutoPlan}
@@ -243,6 +358,13 @@ export default function MapPage() {
           {/* Map settings */}
           <MapSettingsButton settings={settings} onChange={updateSetting} />
         </div>
+
+        {/* Route builder hint banner */}
+        {(routeBuilderOpen || routeBuilderMobileOpen) && (
+          <div className="absolute top-16 left-1/2 z-10 -translate-x-1/2 rounded-full bg-blue-600 px-4 py-2 text-xs font-medium text-white shadow-lg sm:top-[72px]">
+            Tap markers to add / remove stops — {routeStops.length} selected
+          </div>
+        )}
 
         {/* Auto-plan hint banner */}
         {autoPlanActive && (
@@ -305,6 +427,7 @@ export default function MapPage() {
           }
           placeMarkers={placeResults}
           onPlaceClick={(place) => setSelectedPlace(place)}
+          routeStopIds={routeStopIds}
         />
 
         {/* Empty state when filters produce 0 results */}
@@ -317,8 +440,15 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Desktop detail panel */}
-      {selectedId && (
+      {/* Desktop route builder panel (replaces detail when open) */}
+      {routeBuilderOpen && (
+        <div className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
+          {routeBuilderPanel}
+        </div>
+      )}
+
+      {/* Desktop detail panel (only when route builder is closed) */}
+      {!routeBuilderOpen && selectedId && (
         <div className="hidden w-[400px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
           <ContactDetail contactId={selectedId} onClose={handleCloseDetail} />
         </div>
@@ -341,11 +471,21 @@ export default function MapPage() {
 
       {/* Mobile detail bottom sheet */}
       <BottomSheet
-        open={mobileDetailOpen && !!selectedId}
+        open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen}
         onClose={handleCloseDetail}
         size="half"
       >
         <ContactDetail contactId={selectedId} onClose={handleCloseDetail} />
+      </BottomSheet>
+
+      {/* Mobile route builder bottom sheet */}
+      <BottomSheet
+        open={routeBuilderMobileOpen}
+        onClose={closeRouteBuilder}
+        title="Route Builder"
+        size="full"
+      >
+        {routeBuilderPanel}
       </BottomSheet>
 
       {/* Add Place to CRM modal */}

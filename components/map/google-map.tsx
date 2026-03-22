@@ -30,6 +30,8 @@ interface GoogleMapViewProps {
   autoPlanPins?: AutoPlanPins;
   placeMarkers?: PlaceMarker[];
   onPlaceClick?: (place: PlaceMarker) => void;
+  /** IDs of contacts added to the route builder — rendered with a numbered overlay */
+  routeStopIds?: string[];
 }
 
 function getCoverageRing(contact: ContactMarkerData): string {
@@ -118,6 +120,7 @@ export function GoogleMapView({
   autoPlanPins,
   placeMarkers,
   onPlaceClick,
+  routeStopIds = [],
 }: GoogleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { map, ready, error } = useMap(containerRef);
@@ -130,6 +133,8 @@ export function GoogleMapView({
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
   // Track zoom for Option A scaling
   const zoomListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+  // Route stop number overlay markers
+  const routeOverlaysRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
   // Build markers when map, contacts, settings, or coverageMap change
   useEffect(() => {
@@ -339,6 +344,51 @@ export function GoogleMapView({
       autoPlanMarkersRef.current = [];
     };
   }, [map, ready, autoPlanPins]);
+
+  // Route stop number overlays — small numbered badges on selected stops
+  useEffect(() => {
+    if (!map || !ready) return;
+    routeOverlaysRef.current.forEach((m) => (m.map = null));
+    routeOverlaysRef.current = [];
+
+    if (routeStopIds.length === 0) return;
+
+    const newOverlays = routeStopIds.map((id, index) => {
+      const contact = contacts.find((c) => c.id === id);
+      if (!contact) return null;
+
+      const el = document.createElement("div");
+      el.style.width = "18px";
+      el.style.height = "18px";
+      el.style.borderRadius = "50%";
+      el.style.backgroundColor = "#1d4ed8";
+      el.style.border = "2px solid white";
+      el.style.boxShadow = "0 2px 6px rgba(0,0,0,0.4)";
+      el.style.display = "flex";
+      el.style.alignItems = "center";
+      el.style.justifyContent = "center";
+      el.style.fontSize = "9px";
+      el.style.fontWeight = "800";
+      el.style.color = "white";
+      el.style.pointerEvents = "none";
+      el.style.transform = "translate(8px, -8px)";
+      el.textContent = String(index + 1);
+
+      return new google.maps.marker.AdvancedMarkerElement({
+        position: { lat: contact.latitude, lng: contact.longitude },
+        content: el,
+        zIndex: 20,
+        map,
+      });
+    }).filter((m): m is google.maps.marker.AdvancedMarkerElement => m !== null);
+
+    routeOverlaysRef.current = newOverlays;
+
+    return () => {
+      routeOverlaysRef.current.forEach((m) => (m.map = null));
+      routeOverlaysRef.current = [];
+    };
+  }, [map, ready, routeStopIds, contacts]);
 
   // Place search markers (orange diamonds)
   useEffect(() => {
