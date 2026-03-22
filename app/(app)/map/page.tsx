@@ -95,12 +95,11 @@ export default function MapPage() {
     [autoPlanActive, autoPlanStart, autoPlanEnd]
   );
 
-  // Auto-plan: trigger when both pins are set
-  const handleAutoPlan = useCallback(async () => {
-    if (!autoPlanStart || !autoPlanEnd) return;
+  // Auto-plan: trigger with explicit start/end to avoid stale closure on autoPlanEnd
+  const handleAutoPlan = useCallback(async (start: LatLng, end: LatLng) => {
     setAutoPlanLoading(true);
     try {
-      const corridor = contactsInCorridor(filtered, autoPlanStart, autoPlanEnd, 8);
+      const corridor = contactsInCorridor(filtered, start, end, 8);
       if (corridor.length === 0) {
         alert("No contacts found in this corridor. Try a wider area.");
         return;
@@ -127,18 +126,18 @@ export default function MapPage() {
       setAutoPlanStart(null);
       setAutoPlanEnd(null);
     }
-  }, [autoPlanStart, autoPlanEnd, filtered, router]);
+  }, [filtered, router]);
 
-  // Trigger auto-plan when end pin is set
+  // Trigger auto-plan when end pin is set — pass coords explicitly to avoid stale closure
   const handleMapClickWrapper = useCallback(
     (lat: number, lng: number) => {
       if (!autoPlanActive) return;
       if (!autoPlanStart) {
         setAutoPlanStart({ lat, lng });
       } else {
-        setAutoPlanEnd({ lat, lng });
-        // Trigger auto-plan after setting end
-        setTimeout(() => handleAutoPlan(), 100);
+        const end = { lat, lng };
+        setAutoPlanEnd(end);
+        setTimeout(() => handleAutoPlan(autoPlanStart, end), 100);
       }
     },
     [autoPlanActive, autoPlanStart, handleAutoPlan]
@@ -186,11 +185,15 @@ export default function MapPage() {
   }, [routeStops.length]);
 
   const handleAddAllFiltered = useCallback(() => {
-    setRouteStops(filtered);
+    setRouteStops((prev) => {
+      const existingIds = new Set(prev.map((s) => s.id));
+      const toAdd = filtered.filter((c) => !existingIds.has(c.id));
+      return [...prev, ...toAdd];
+    });
   }, [filtered]);
 
   const handleMarkAllVisited = useCallback(async () => {
-    await Promise.all(
+    await Promise.allSettled(
       routeStops.map((stop) =>
         fetch(`/api/contacts/${stop.id}`, {
           method: "PATCH",

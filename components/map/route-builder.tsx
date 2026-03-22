@@ -33,16 +33,16 @@ interface RouteBuilderProps {
 
 function buildGoogleMapsLink(batch: ContactMarkerData[]): string {
   if (batch.length === 0) return "";
-  const waypoints = batch.map((s) => `${s.latitude},${s.longitude}`);
-  if (waypoints.length === 1) {
-    return `https://www.google.com/maps/search/?api=1&query=${waypoints[0]}`;
+  const encode = (c: ContactMarkerData) =>
+    encodeURIComponent(`${c.latitude},${c.longitude}`);
+  if (batch.length === 1) {
+    return `https://www.google.com/maps/search/?api=1&query=${encode(batch[0])}`;
   }
-  const origin = waypoints[0];
-  const destination = waypoints[waypoints.length - 1];
-  const mid = waypoints.slice(1, -1);
-  let url = `https://www.google.com/maps/dir/${origin}`;
-  if (mid.length > 0) url += `/${mid.join("/")}`;
-  url += `/${destination}`;
+  const origin = encode(batch[0]);
+  const destination = encode(batch[batch.length - 1]);
+  const mid = batch.slice(1, -1).map(encode);
+  let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}`;
+  if (mid.length > 0) url += `&waypoints=${mid.join("|")}`;
   return url;
 }
 
