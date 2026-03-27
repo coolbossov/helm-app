@@ -83,19 +83,6 @@ export default function MapPage() {
     setMobileDetailOpen(false);
   }, []);
 
-  // Auto-plan: handle map clicks
-  const handleMapClick = useCallback(
-    (lat: number, lng: number) => {
-      if (!autoPlanActive) return;
-      if (!autoPlanStart) {
-        setAutoPlanStart({ lat, lng });
-      } else if (!autoPlanEnd) {
-        setAutoPlanEnd({ lat, lng });
-      }
-    },
-    [autoPlanActive, autoPlanStart, autoPlanEnd]
-  );
-
   // Auto-plan: trigger with explicit start/end to avoid stale closure on autoPlanEnd
   const handleAutoPlan = useCallback(async (start: LatLng, end: LatLng) => {
     setAutoPlanLoading(true);
