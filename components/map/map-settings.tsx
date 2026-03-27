@@ -7,9 +7,16 @@ import type { MapSettings } from "@/lib/hooks/use-map-settings";
 interface MapSettingsProps {
   settings: MapSettings;
   onChange: (key: keyof MapSettings, value: boolean) => void;
+  autoPlanActive?: boolean;
+  onToggleAutoPlan?: () => void;
 }
 
-export function MapSettingsButton({ settings, onChange }: MapSettingsProps) {
+export function MapSettingsButton({
+  settings,
+  onChange,
+  autoPlanActive,
+  onToggleAutoPlan,
+}: MapSettingsProps) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -35,6 +42,27 @@ export function MapSettingsButton({ settings, onChange }: MapSettingsProps) {
 
       {open && (
         <div className="absolute right-0 top-12 z-20 w-56 rounded-xl border border-gray-200 bg-white p-3 shadow-lg">
+          <p className="mb-2 text-xs font-semibold text-gray-500 uppercase">
+            Colors &amp; Mode
+          </p>
+
+          <Toggle
+            label="Color by visit status"
+            description="Pin colors show visit progress"
+            checked={settings.visitColorMode}
+            onChange={(v) => onChange("visitColorMode", v)}
+          />
+
+          {onToggleAutoPlan && (
+            <Toggle
+              label="Auto-plan route"
+              description="Click map to draw a corridor"
+              checked={autoPlanActive ?? false}
+              onChange={() => onToggleAutoPlan()}
+            />
+          )}
+
+          <div className="my-2 border-t border-gray-100" />
           <p className="mb-2 text-xs font-semibold text-gray-500 uppercase">
             Marker Options
           </p>

@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { Filter, Wand2, Eye, Route, Telescope } from "lucide-react";
+import { Filter, Route, Telescope } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
 import { FilterPanel } from "@/components/map/filter-panel";
 import { ContactDetail } from "@/components/map/contact-detail";
@@ -82,19 +82,6 @@ export default function MapPage() {
     setSelectedId(null);
     setMobileDetailOpen(false);
   }, []);
-
-  // Auto-plan: handle map clicks
-  const handleMapClick = useCallback(
-    (lat: number, lng: number) => {
-      if (!autoPlanActive) return;
-      if (!autoPlanStart) {
-        setAutoPlanStart({ lat, lng });
-      } else if (!autoPlanEnd) {
-        setAutoPlanEnd({ lat, lng });
-      }
-    },
-    [autoPlanActive, autoPlanStart, autoPlanEnd]
-  );
 
   // Auto-plan: trigger with explicit start/end to avoid stale closure on autoPlanEnd
   const handleAutoPlan = useCallback(async (start: LatLng, end: LatLng) => {
@@ -257,7 +244,7 @@ export default function MapPage() {
         <div className="text-center">
           <p className="text-sm text-red-600">{error}</p>
           <p className="mt-1 text-xs text-gray-500">
-            Make sure you've synced contacts from Settings.
+            Make sure you&apos;ve synced contacts from Settings.
           </p>
         </div>
       </div>
@@ -323,9 +310,10 @@ export default function MapPage() {
                 setFilterOpen((v) => !v);
               }
             }}
-            className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-gray-300 bg-white shadow-sm hover:bg-gray-50"
+            className="relative flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-gray-300 bg-white px-2 shadow-sm hover:bg-gray-50 sm:px-3"
           >
             <Filter className="h-4 w-4 text-gray-600" />
+            <span className="hidden text-xs font-medium text-gray-600 sm:inline">Filter</span>
             {activeFilterCount > 0 && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
                 {activeFilterCount}
@@ -345,7 +333,7 @@ export default function MapPage() {
           {/* Discover toggle */}
           <button
             onClick={openDiscover}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
+            className={`flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 shadow-sm transition-colors sm:px-3 ${
               discoverOpen || discoverMobileOpen
                 ? "border-orange-500 bg-orange-500 text-white"
                 : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
@@ -353,12 +341,15 @@ export default function MapPage() {
             title="Discover nearby leads"
           >
             <Telescope className="h-4 w-4" />
+            <span className={`hidden text-xs font-medium sm:inline ${
+              discoverOpen || discoverMobileOpen ? "text-white" : "text-gray-600"
+            }`}>Discover</span>
           </button>
 
           {/* Route builder toggle */}
           <button
             onClick={openRouteBuilder}
-            className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
+            className={`relative flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 shadow-sm transition-colors sm:px-3 ${
               routeBuilderOpen || routeBuilderMobileOpen
                 ? "border-blue-500 bg-blue-600 text-white"
                 : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
@@ -366,6 +357,9 @@ export default function MapPage() {
             title="Build a route"
           >
             <Route className="h-4 w-4" />
+            <span className={`hidden text-xs font-medium sm:inline ${
+              routeBuilderOpen || routeBuilderMobileOpen ? "text-white" : "text-gray-600"
+            }`}>Route</span>
             {routeStops.length > 0 && !(routeBuilderOpen || routeBuilderMobileOpen) && (
               <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-blue-600 text-[9px] font-bold text-white">
                 {routeStops.length}
@@ -373,34 +367,13 @@ export default function MapPage() {
             )}
           </button>
 
-          {/* Auto-plan toggle */}
-          <button
-            onClick={toggleAutoPlan}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
-              autoPlanActive
-                ? "border-blue-500 bg-blue-600 text-white"
-                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-            title="Auto-plan route"
-          >
-            <Wand2 className="h-4 w-4" />
-          </button>
-
-          {/* Visit color mode toggle */}
-          <button
-            onClick={() => updateSetting("visitColorMode", !settings.visitColorMode)}
-            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border shadow-sm transition-colors ${
-              settings.visitColorMode
-                ? "border-green-500 bg-green-600 text-white"
-                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
-            }`}
-            title={settings.visitColorMode ? "Showing visit status colors" : "Show visit status colors"}
-          >
-            <Eye className="h-4 w-4" />
-          </button>
-
-          {/* Map settings */}
-          <MapSettingsButton settings={settings} onChange={updateSetting} />
+          {/* Map settings (includes visit colors + auto-plan toggles) */}
+          <MapSettingsButton
+            settings={settings}
+            onChange={updateSetting}
+            autoPlanActive={autoPlanActive}
+            onToggleAutoPlan={toggleAutoPlan}
+          />
         </div>
 
         {/* Route builder hint banner */}

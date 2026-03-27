@@ -54,7 +54,7 @@ export async function syncAllContacts(): Promise<{
   const supabase = createAdminClient();
   const contacts = await fetchAllContacts();
 
-  let created = 0;
+  const created = 0;
   let updated = 0;
 
   // Process in batches of 50
