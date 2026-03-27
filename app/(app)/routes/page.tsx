@@ -20,6 +20,11 @@ export default function RoutesPage() {
   const { routes, loading, error, deleteRoute } = useRoutes();
   const [statusFilter, setStatusFilter] = useState("");
 
+  const filteredRoutes = useMemo(() => {
+    if (!statusFilter) return routes;
+    return routes.filter((r) => r.status === statusFilter);
+  }, [routes, statusFilter]);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -35,11 +40,6 @@ export default function RoutesPage() {
       </div>
     );
   }
-
-  const filteredRoutes = useMemo(() => {
-    if (!statusFilter) return routes;
-    return routes.filter((r) => r.status === statusFilter);
-  }, [routes, statusFilter]);
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6">

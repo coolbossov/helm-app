@@ -183,7 +183,7 @@ export default function SettingsPage() {
             </div>
           ) : logs.length === 0 ? (
             <p className="text-center text-sm text-gray-500 py-4">
-              No sync history yet. Click "Sync Now" to start.
+              No sync history yet. Click &quot;Sync Now&quot; to start.
             </p>
           ) : (
             <div className="space-y-3">

@@ -244,7 +244,7 @@ export default function MapPage() {
         <div className="text-center">
           <p className="text-sm text-red-600">{error}</p>
           <p className="mt-1 text-xs text-gray-500">
-            Make sure you've synced contacts from Settings.
+            Make sure you&apos;ve synced contacts from Settings.
           </p>
         </div>
       </div>
