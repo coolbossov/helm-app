@@ -15,9 +15,9 @@ const STORAGE_KEY = "sapd-map-settings";
 const DEFAULT_SETTINGS: MapSettings = {
   outlinedMarkers: true,
   pinMarkers: false,
-  simplifiedMap: false,
+  simplifiedMap: true,
   coverageOverlay: false,
-  visitColorMode: false,
+  visitColorMode: true,
 };
 
 export function useMapSettings() {
