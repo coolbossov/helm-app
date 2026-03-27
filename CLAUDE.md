@@ -35,6 +35,13 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Detail data fetched on marker click (too large to preload for all)
 - CRM sync is manual (Phase 1), triggered from settings page
 
+## Git workflow (enforced — no exceptions)
+
+- **Never commit directly to `main`** — all code changes go through a branch + PR
+- **Auto-branch on first code edit** — the moment a session transitions from research/planning to implementation, create a branch before the first file edit. Use prefix conventions: `feat/`, `fix/`, `chore/`, `docs/`
+- **End of session** — run `@review-2-code-commit` before pushing. This triggers the `opencode-review` GitHub Action on the PR automatically
+- CI passes → PR is squash-merged automatically and branch is deleted
+
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
 - `npm run build` — Production build
