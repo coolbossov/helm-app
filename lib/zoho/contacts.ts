@@ -54,13 +54,33 @@ export async function syncAllContacts(): Promise<{
   const supabase = createAdminClient();
   const contacts = await fetchAllContacts();
 
-  const created = 0;
+  let created = 0;
   let updated = 0;
 
   // Process in batches of 50
   for (let i = 0; i < contacts.length; i += 50) {
     const batch = contacts.slice(i, i + 50);
     const rows = batch.map(contactToRow);
+    const zohoIds = batch.map((contact) => contact.id);
+
+    // Check which contacts already exist to distinguish creates from updates
+    const { data: existingContacts, error: existingError } = await supabase
+      .from("synced_contacts")
+      .select("zoho_id")
+      .in("zoho_id", zohoIds);
+
+    if (existingError) {
+      console.error("Select existing batch error:", existingError);
+      throw new Error(`Failed to check existing contacts: ${existingError.message}`);
+    }
+
+    const existingIds = new Set(
+      (existingContacts ?? []).map((row) => row.zoho_id),
+    );
+    const batchCreated = batch.filter(
+      (contact) => !existingIds.has(contact.id),
+    ).length;
+    created += batchCreated;
 
     // visit_status and last_visit_date are NOT in contactToRow() — they're app-managed
     // and will not be overwritten by Bigin syncs
@@ -74,9 +94,9 @@ export async function syncAllContacts(): Promise<{
       throw new Error(`Failed to upsert contacts: ${error.message}`);
     }
 
-    // Count new vs updated (approximate — all upserts counted)
+    // Count created vs updated based on pre-upsert existence check
     if (data) {
-      updated += data.length;
+      updated += Math.max(data.length - batchCreated, 0);
     }
   }
 
@@ -101,7 +121,7 @@ export async function syncAllContacts(): Promise<{
   return {
     synced: contacts.length,
     created,
-    updated: contacts.length,
+    updated,
   };
 }
 
