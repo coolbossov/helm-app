@@ -18,20 +18,34 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
       .then(() => {
         if (!containerRef.current) return;
 
-        // Vector maps (mapId) use cloud-based styling configured in Google Cloud Console.
-        // The inline `styles` property is incompatible with vector maps and causes errors.
-        // To customize POI/transit visibility, create a Map Style in:
-        // Google Cloud Console → Maps Platform → Map Styles
+        // Clean map: hide all POIs, transit, neighborhoods, landmarks, parks,
+        // city names, water labels, highway shields. Only show street names
+        // (light gray) when zoomed in close.
         const map = new google.maps.Map(containerRef.current, {
           center: SA_CENTER,
           zoom: DEFAULT_ZOOM,
-          mapId: "72aa8a78bc046c7f503dedc8",
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
           gestureHandling: "greedy",
+          styles: [
+            // ── Hide everything we don't need ──
+            { featureType: "poi", stylers: [{ visibility: "off" }] },
+            { featureType: "transit", stylers: [{ visibility: "off" }] },
+            { featureType: "administrative", elementType: "labels", stylers: [{ visibility: "off" }] },
+            { featureType: "landscape", elementType: "labels", stylers: [{ visibility: "off" }] },
+            { featureType: "water", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Hide highway shields & road icons
+            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+            // Hide highway & arterial labels (only local streets visible)
+            { featureType: "road.highway", elementType: "labels", stylers: [{ visibility: "off" }] },
+            { featureType: "road.arterial", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Local street names: light gray
+            { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+            { featureType: "road.local", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
+          ],
         });
 
         mapRef.current = map;
