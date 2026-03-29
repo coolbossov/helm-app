@@ -1,8 +1,6 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Force clean builds when env changes — Turbopack cache key
-  generateBuildId: () => `build-${Date.now()}`,
   reactStrictMode: true,
   async headers() {
     return [
