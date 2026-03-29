@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" fill="none" stroke="#E91E8C" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+  <!-- Folded map -->
+  <polyline points="24,208 72,184 128,208 184,184 232,208 232,56 184,80 128,56 72,80 24,56 24,208"/>
+  <line x1="72" y1="80" x2="72" y2="184"/>
+  <line x1="184" y1="80" x2="184" y2="184"/>
+  <!-- Map pin -->
+  <path d="M128,32 C106,32 88,50 88,72 C88,104 128,144 128,144 C128,144 168,104 168,72 C168,50 150,32 128,32 Z"/>
+  <circle cx="128" cy="72" r="16"/>
+</svg>
