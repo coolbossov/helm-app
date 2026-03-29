@@ -8,9 +8,23 @@ import { replayOfflineQueue } from "@/lib/offline/sync-queue";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    // Register service worker
+    // Disable old cache-first service worker to prevent stale /map bundles.
     if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/sw.js").catch(() => {/* ignore */});
+      navigator.serviceWorker
+        .getRegistrations()
+        .then((registrations) => Promise.all(registrations.map((r) => r.unregister())))
+        .catch(() => {
+          /* ignore */
+        });
+    }
+
+    if ("caches" in window) {
+      caches
+        .keys()
+        .then((keys) => Promise.all(keys.filter((k) => k.startsWith("sapd-shell-")).map((k) => caches.delete(k))))
+        .catch(() => {
+          /* ignore */
+        });
     }
 
     // Replay queued mutations when coming back online
