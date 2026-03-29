@@ -22,7 +22,21 @@ async function postNote(zohoId: string, title: string, content: string): Promise
   }
 }
 
-export async function processPendingActivitySync(): Promise<{ synced: number; failed: number }> {
+export interface ActivitySyncDetail {
+  contactName: string;
+  type: string;
+  title: string;
+  status: "synced" | "failed";
+  error?: string;
+}
+
+export interface ActivitySyncResult {
+  synced: number;
+  failed: number;
+  details: ActivitySyncDetail[];
+}
+
+export async function processPendingActivitySync(): Promise<ActivitySyncResult> {
   const admin = createAdminClient();
 
   const { data: pending, error } = await admin
@@ -33,49 +47,60 @@ export async function processPendingActivitySync(): Promise<{ synced: number; fa
     .limit(50);
 
   if (error || !pending || pending.length === 0) {
-    return { synced: 0, failed: 0 };
+    return { synced: 0, failed: 0, details: [] };
   }
 
   const contactIds = [...new Set(pending.map((r) => r.contact_id))];
   const { data: contacts } = await admin
     .from("synced_contacts")
-    .select("id, zoho_id")
+    .select("id, zoho_id, first_name, last_name")
     .in("id", contactIds);
 
-  const zohoIdMap = new Map<string, string>(
-    (contacts ?? []).map((c) => [c.id, c.zoho_id])
+  const contactMap = new Map<string, { zohoId: string; name: string }>(
+    (contacts ?? []).map((c) => [
+      c.id,
+      {
+        zohoId: c.zoho_id,
+        name: c.first_name ? `${c.first_name} ${c.last_name}` : c.last_name,
+      },
+    ]),
   );
 
   let synced = 0;
   let failed = 0;
+  const details: ActivitySyncDetail[] = [];
 
   for (const activity of pending) {
-    const zohoId = zohoIdMap.get(activity.contact_id);
-    if (!zohoId) {
-      await admin
-        .from("contact_activities")
-        .update({ bigin_synced: true, bigin_synced_at: new Date().toISOString() })
-        .eq("id", activity.id);
-      synced++;
-      continue;
-    }
-
+    const contact = contactMap.get(activity.contact_id);
+    const contactName = contact?.name ?? "Unknown";
     const noteTitle = activity.title || `${activity.activity_type} logged`;
     const noteContent = activity.content || noteTitle;
 
-    try {
-      await postNote(zohoId, noteTitle, noteContent);
+    if (!contact) {
       await admin
         .from("contact_activities")
         .update({ bigin_synced: true, bigin_synced_at: new Date().toISOString() })
         .eq("id", activity.id);
       synced++;
+      details.push({ contactName, type: activity.activity_type, title: noteTitle, status: "synced" });
+      continue;
+    }
+
+    try {
+      await postNote(contact.zohoId, noteTitle, noteContent);
+      await admin
+        .from("contact_activities")
+        .update({ bigin_synced: true, bigin_synced_at: new Date().toISOString() })
+        .eq("id", activity.id);
+      synced++;
+      details.push({ contactName, type: activity.activity_type, title: noteTitle, status: "synced" });
     } catch (err) {
       const message = err instanceof Error ? err.message : "Unknown error";
       console.error(`Failed to sync activity ${activity.id}:`, message);
       failed++;
+      details.push({ contactName, type: activity.activity_type, title: noteTitle, status: "failed", error: message });
     }
   }
 
-  return { synced, failed };
+  return { synced, failed, details };
 }
