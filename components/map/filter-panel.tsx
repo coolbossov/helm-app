@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
@@ -100,7 +101,7 @@ function CheckboxGroup<T extends string>({
   );
 }
 
-export function FilterPanel({
+export const FilterPanel = memo(function FilterPanel({
   filters,
   onUpdate,
   onReset,
@@ -228,4 +229,4 @@ export function FilterPanel({
       </div>
     </div>
   );
-}
+});

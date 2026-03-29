@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo } from "react";
 import {
   X,
   Search,
@@ -61,7 +61,7 @@ interface ResultState {
   selectedTypes: string[];
 }
 
-export function DiscoverPanel({
+export const DiscoverPanel = memo(function DiscoverPanel({
   center,
   onClose,
   onLeadAdded,
@@ -463,4 +463,4 @@ export function DiscoverPanel({
       </div>
     </div>
   );
-}
+});

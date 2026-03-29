@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, memo } from "react";
 import {
   X,
   Navigation,
@@ -30,7 +30,7 @@ interface ContactDetailProps {
   onClose: () => void;
 }
 
-export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
+export const ContactDetail = memo(function ContactDetail({ contactId, onClose }: ContactDetailProps) {
   const { contact, loading, refetch } = useContactDetail(contactId);
   const { activities, loading: activitiesLoading, addActivity } = useActivities(contactId);
   const [addingNote, setAddingNote] = useState(false);
@@ -425,4 +425,4 @@ export function ContactDetail({ contactId, onClose }: ContactDetailProps) {
       </div>
     </div>
   );
-}
+});

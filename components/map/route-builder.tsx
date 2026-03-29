@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, memo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import {
   X,
@@ -83,7 +83,7 @@ function splitBatches(stops: ContactMarkerData[]): ContactMarkerData[][] {
   return batches;
 }
 
-export function RouteBuilder({
+export const RouteBuilder = memo(function RouteBuilder({
   stops,
   allFiltered,
   onRemove,
@@ -355,4 +355,4 @@ export function RouteBuilder({
       )}
     </>
   );
-}
+});

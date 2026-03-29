@@ -1,6 +1,8 @@
 "use client";
 
-export function CoverageLegend() {
+import { memo } from "react";
+
+export const CoverageLegend = memo(function CoverageLegend() {
   return (
     <div className="rounded-lg bg-white/90 px-3 py-2 shadow-sm backdrop-blur-sm">
       <p className="mb-1.5 text-[10px] font-semibold text-gray-500 uppercase">Coverage</p>
@@ -20,4 +22,4 @@ export function CoverageLegend() {
       </div>
     </div>
   );
-}
+});

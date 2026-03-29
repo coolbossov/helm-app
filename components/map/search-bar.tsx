@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo, memo } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContactMarkerData } from "@/types";
@@ -14,7 +14,7 @@ interface SearchBarProps {
   className?: string;
 }
 
-export function SearchBar({
+export const SearchBar = memo(function SearchBar({
   contacts,
   onSelect,
   value,
@@ -25,7 +25,7 @@ export function SearchBar({
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const results =
+  const results = useMemo(() =>
     value.length >= 2
       ? contacts
           .filter((c) => {
@@ -33,7 +33,9 @@ export function SearchBar({
             return name.includes(value.toLowerCase());
           })
           .slice(0, 8)
-      : [];
+      : [],
+    [contacts, value]
+  );
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -110,4 +112,4 @@ export function SearchBar({
       )}
     </div>
   );
-}
+});

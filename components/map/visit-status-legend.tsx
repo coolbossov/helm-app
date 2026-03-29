@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, memo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
 import { VISIT_STATUS_COLORS, type VisitStatus } from "@/types";
 
@@ -15,7 +15,7 @@ const LEGEND_ITEMS: { status: VisitStatus; label: string }[] = [
 
 const STORAGE_KEY = "sapd-legend-collapsed";
 
-export function VisitStatusLegend() {
+export const VisitStatusLegend = memo(function VisitStatusLegend() {
   const [collapsed, setCollapsed] = useState(false);
 
   useEffect(() => {
@@ -69,4 +69,4 @@ export function VisitStatusLegend() {
       )}
     </div>
   );
-}
+});
