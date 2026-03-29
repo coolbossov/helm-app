@@ -17,9 +17,6 @@ const viewportSchema = z.object({
 }).refine((data) => data.north > data.south, {
   message: "north must be greater than south",
   path: ["north"],
-}).refine((data) => data.east > data.west, {
-  message: "viewport cannot cross the antimeridian (east must be greater than west)",
-  path: ["east"],
 });
 
 const radiusSchema = z.object({
@@ -81,6 +78,33 @@ const FIELD_MASK = [
   "places.primaryType",
 ].join(",");
 
+async function searchPlaces(
+  apiKey: string,
+  requestBody: Record<string, unknown>
+): Promise<PlacesNewPlace[]> {
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": FIELD_MASK,
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!res.ok) {
+    const errorBody = await res.text();
+    throw new Error(`Places API error: ${res.status} ${errorBody}`);
+  }
+
+  const json = (await res.json()) as PlacesNewResponse;
+  if (json.error) {
+    throw new Error(json.error.message || `Places API error: ${json.error.status}`);
+  }
+
+  return json.places ?? [];
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -102,11 +126,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Google Maps API key not configured" }, { status: 500 });
   }
 
-  // Places API (New) Text Search with either a viewport rectangle
-  // or center/radius fallback for backward compatibility.
-  const requestBody =
-    "north" in parsed.data
-      ? {
+  let allResults: PlacesNewPlace[] = [];
+  try {
+    // Places API (New) Text Search with either a viewport rectangle
+    // or center/radius fallback for backward compatibility.
+    if ("north" in parsed.data) {
+      // Antimeridian-aware viewport support.
+      // east >= west is a normal rectangle. east < west means viewport crosses
+      // the international date line, so split into two rectangles.
+      if (parsed.data.east >= parsed.data.west) {
+        allResults = await searchPlaces(apiKey, {
           textQuery: keyword,
           locationRestriction: {
             rectangle: {
@@ -121,49 +150,72 @@ export async function POST(request: NextRequest) {
             },
           },
           maxResultCount: 20,
-        }
-      : {
-          textQuery: keyword,
-          locationBias: {
-            circle: {
-              center: {
-                latitude: parsed.data.lat,
-                longitude: parsed.data.lng,
+        });
+      } else {
+        const [westHemisphere, eastHemisphere] = await Promise.all([
+          searchPlaces(apiKey, {
+            textQuery: keyword,
+            locationRestriction: {
+              rectangle: {
+                low: {
+                  latitude: parsed.data.south,
+                  longitude: parsed.data.west,
+                },
+                high: {
+                  latitude: parsed.data.north,
+                  longitude: 180,
+                },
               },
-              radius: parsed.data.radius,
             },
+            maxResultCount: 20,
+          }),
+          searchPlaces(apiKey, {
+            textQuery: keyword,
+            locationRestriction: {
+              rectangle: {
+                low: {
+                  latitude: parsed.data.south,
+                  longitude: -180,
+                },
+                high: {
+                  latitude: parsed.data.north,
+                  longitude: parsed.data.east,
+                },
+              },
+            },
+            maxResultCount: 20,
+          }),
+        ]);
+
+        const deduped = new Map<string, PlacesNewPlace>();
+        for (const place of [...westHemisphere, ...eastHemisphere]) {
+          deduped.set(place.id, place);
+        }
+        allResults = Array.from(deduped.values()).slice(0, 20);
+      }
+    } else {
+      allResults = await searchPlaces(apiKey, {
+        textQuery: keyword,
+        locationBias: {
+          circle: {
+            center: {
+              latitude: parsed.data.lat,
+              longitude: parsed.data.lng,
+            },
+            radius: parsed.data.radius,
           },
-          maxResultCount: 20,
-        };
-
-  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "X-Goog-Api-Key": apiKey,
-      "X-Goog-FieldMask": FIELD_MASK,
-    },
-    body: JSON.stringify(requestBody),
-  });
-
-  if (!res.ok) {
-    const errorBody = await res.text();
+        },
+        maxResultCount: 20,
+      });
+    }
+  } catch (error) {
     return NextResponse.json(
-      { error: `Places API error: ${res.status} ${errorBody}` },
+      {
+        error: error instanceof Error ? error.message : "Places API error",
+      },
       { status: 502 }
     );
   }
-
-  const json = (await res.json()) as PlacesNewResponse;
-
-  if (json.error) {
-    return NextResponse.json(
-      { error: json.error.message || `Places API error: ${json.error.status}` },
-      { status: 502 }
-    );
-  }
-
-  const allResults = json.places ?? [];
 
   if (allResults.length === 0) {
     return NextResponse.json({ data: [] });
