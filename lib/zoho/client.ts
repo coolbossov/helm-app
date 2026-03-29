@@ -3,6 +3,30 @@ import type { ZohoListResponse, ZohoContact } from "@/types";
 
 const BIGIN_API_BASE = "https://www.zohoapis.com/bigin/v2";
 
+// Bigin v2 requires explicit field selection — omitting fields returns REQUIRED_PARAM_MISSING
+const CONTACT_FIELDS = [
+  "Last_Name",
+  "First_Name",
+  "Account_Name",
+  "Email",
+  "Phone",
+  "Mobile",
+  "Website",
+  "Mailing_Street",
+  "Mailing_City",
+  "Mailing_State",
+  "Mailing_Zip",
+  "Mailing_Country",
+  "Business_Type",
+  "Priority",
+  "Lifecycle_stage",
+  "Contacting_Status",
+  "Contacting_Tips",
+  "Prospecting_Initial_notes",
+  "Created_Time",
+  "Modified_Time",
+].join(",");
+
 async function zohoFetch<T>(path: string, options?: RequestInit): Promise<T> {
   const token = await getAccessToken();
   const response = await fetch(`${BIGIN_API_BASE}${path}`, {
@@ -29,7 +53,7 @@ export async function fetchAllContacts(): Promise<ZohoContact[]> {
 
   while (hasMore) {
     const response = await zohoFetch<ZohoListResponse>(
-      `/Contacts?page=${page}&per_page=200`
+      `/Contacts?fields=${CONTACT_FIELDS}&page=${page}&per_page=200`
     );
 
     if (response.data) {
@@ -57,7 +81,7 @@ export async function fetchContactsSince(
 
   while (hasMore) {
     const response = await zohoFetch<ZohoListResponse>(
-      `/Contacts?page=${page}&per_page=200&modified_since=${modifiedTime}`
+      `/Contacts?fields=${CONTACT_FIELDS}&page=${page}&per_page=200&modified_since=${modifiedTime}`
     );
 
     if (response.data) {
