@@ -9,9 +9,13 @@ import {
   getVisitRecencyColor,
   CLUSTER_MAX_ZOOM,
 } from "@/types";
+import { HOME_BASE } from "@/types/maps";
 import type { ContactMarkerData } from "@/types";
 import type { MapSettings } from "@/lib/hooks/use-map-settings";
 import { Spinner } from "@/components/ui";
+
+const HOME_MARKER_COLOR = "#00c2cc";
+const LEAD_MARKER_COLOR = "#ff0092";
 
 interface AutoPlanPins {
   start?: { lat: number; lng: number };
@@ -140,7 +144,9 @@ export const GoogleMapView = memo(function GoogleMapView({
 
   const autoPlanMarkersRef = useRef<google.maps.Marker[]>([]);
   const placeMarkersRef = useRef<google.maps.Marker[]>([]);
+  const searchPinSignatureRef = useRef<string>("");
   const routeOverlaysRef = useRef<google.maps.Marker[]>([]);
+  const homeMarkerRef = useRef<google.maps.Marker | null>(null);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
   /* ─── Fix 6: O(1) contact lookup map ─── */
@@ -380,29 +386,75 @@ export const GoogleMapView = memo(function GoogleMapView({
     };
   }, [map, ready, routeStopIds, contactById]);
 
+  /* ─── Home base marker ─── */
+  useEffect(() => {
+    if (!map || !ready) return;
+
+    if (homeMarkerRef.current) {
+      homeMarkerRef.current.setMap(null);
+      homeMarkerRef.current = null;
+    }
+
+    homeMarkerRef.current = new google.maps.Marker({
+      position: HOME_BASE,
+      map,
+      clickable: false,
+      title: "Home Base - 10010 Shetland Gate",
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: HOME_MARKER_COLOR,
+        fillOpacity: 1,
+        strokeColor: "#ffffff",
+        strokeWeight: 2,
+        scale: 8,
+      },
+      label: {
+        text: "H",
+        color: "#ffffff",
+        fontWeight: "700",
+        fontSize: "11px",
+      },
+      zIndex: 1200,
+    });
+
+    return () => {
+      if (homeMarkerRef.current) {
+        homeMarkerRef.current.setMap(null);
+        homeMarkerRef.current = null;
+      }
+    };
+  }, [map, ready]);
+
   /* ─── Find-leads search pins — uses stable ref for callback ─── */
   useEffect(() => {
     if (!map || !ready) return;
     placeMarkersRef.current.forEach((m) => m.setMap(null));
     placeMarkersRef.current = [];
 
-    if (!searchPins || searchPins.length === 0) return;
+    if (!searchPins || searchPins.length === 0) {
+      searchPinSignatureRef.current = "";
+      return;
+    }
+
+    const nextSearchPinSignature = searchPins.map((place) => place.place_id).sort().join("|");
+    const shouldRefitMap = nextSearchPinSignature !== searchPinSignatureRef.current;
+    searchPinSignatureRef.current = nextSearchPinSignature;
 
     placeMarkersRef.current = searchPins.map((place) => {
-      const fillColor = place.inCrm ? "#9ca3af" : "#f97316";
-      const strokeColor = place.selected ? "#2563eb" : "#ffffff";
-      const strokeWeight = place.selected ? 4 : 2;
+      const fillColor = place.inCrm ? "#9ca3af" : LEAD_MARKER_COLOR;
+      const strokeColor = place.selected ? HOME_MARKER_COLOR : "#ffffff";
+      const strokeWeight = place.selected ? 3 : 2;
       const marker = new google.maps.Marker({
         position: { lat: place.lat, lng: place.lng },
         map,
         title: place.name,
         icon: {
-          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
           fillColor,
           fillOpacity: 1,
           strokeColor,
           strokeWeight,
-          scale: 5,
+          scale: place.selected ? 9 : 7,
           rotation: 45,
         },
         zIndex: place.selected ? 1003 : 1000,
@@ -410,6 +462,19 @@ export const GoogleMapView = memo(function GoogleMapView({
       marker.addListener("click", () => onSearchPinClickRef.current?.(place.place_id));
       return marker;
     });
+
+    if (shouldRefitMap) {
+      if (searchPins.length === 1) {
+        map.panTo({ lat: searchPins[0].lat, lng: searchPins[0].lng });
+        if ((map.getZoom() ?? 0) < 14) map.setZoom(14);
+      } else {
+        const bounds = new google.maps.LatLngBounds();
+        for (const place of searchPins) {
+          bounds.extend({ lat: place.lat, lng: place.lng });
+        }
+        map.fitBounds(bounds, 64);
+      }
+    }
 
     return () => {
       placeMarkersRef.current.forEach((m) => m.setMap(null));

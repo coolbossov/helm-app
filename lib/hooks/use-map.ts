@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from "react";
 import { loadGoogleMaps } from "@/lib/google/maps-loader";
-import { SA_CENTER, DEFAULT_ZOOM } from "@/types/maps";
+import { HOME_BASE, HOME_BASE_ZOOM } from "@/types/maps";
 
 /* ─── Module-level constant — never recreated ─── */
 const MAP_STYLES: google.maps.MapTypeStyle[] = [
@@ -33,8 +33,8 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
         if (!containerRef.current) return;
 
         const map = new google.maps.Map(containerRef.current, {
-          center: SA_CENTER,
-          zoom: DEFAULT_ZOOM,
+          center: HOME_BASE,
+          zoom: HOME_BASE_ZOOM,
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,

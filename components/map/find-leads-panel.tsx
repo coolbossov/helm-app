@@ -321,8 +321,8 @@ export function FindLeadsPanel({
       </div>
 
       <div className="space-y-3 border-b border-gray-200 p-4">
-        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 focus-within:border-orange-400 focus-within:ring-1 focus-within:ring-orange-400">
-          <Search className="h-4 w-4 shrink-0 text-orange-500" />
+        <div className="flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 focus-within:border-pink-500 focus-within:ring-1 focus-within:ring-pink-500">
+          <Search className="h-4 w-4 shrink-0 text-pink-600" />
           <input
             type="text"
             value={keyword}
@@ -366,7 +366,7 @@ export function FindLeadsPanel({
                     setKeyword(suggestion);
                     setShowSuggestions(false);
                   }}
-                  className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-orange-50 hover:text-orange-700"
+                  className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-700 hover:bg-pink-50 hover:text-pink-700"
                 >
                   {suggestion}
                 </button>
@@ -381,7 +381,7 @@ export function FindLeadsPanel({
             void runSearch();
           }}
           disabled={!keyword.trim() || loading}
-          className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-medium text-white hover:bg-orange-600 disabled:opacity-50"
+          className="flex w-full items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-sm font-medium text-white hover:bg-pink-700 disabled:opacity-50"
         >
           {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
           {loading ? "Searching..." : "Search This View"}
@@ -542,7 +542,7 @@ export function FindLeadsPanel({
           <button
             onClick={() => void handleConfirmAdd()}
             disabled={addingLeads}
-            className="flex w-full items-center justify-center gap-2 rounded-lg bg-orange-500 px-4 py-2 text-sm font-semibold text-white hover:bg-orange-600 disabled:opacity-50"
+            className="flex w-full items-center justify-center gap-2 rounded-lg bg-pink-600 px-4 py-2 text-sm font-semibold text-white hover:bg-pink-700 disabled:opacity-50"
           >
             {addingLeads ? (
               <Loader2 className="h-4 w-4 animate-spin" />
