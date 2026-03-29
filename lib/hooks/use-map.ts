@@ -4,6 +4,20 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { loadGoogleMaps } from "@/lib/google/maps-loader";
 import { SA_CENTER, DEFAULT_ZOOM } from "@/types/maps";
 
+/* ─── Module-level constant — never recreated ─── */
+const MAP_STYLES: google.maps.MapTypeStyle[] = [
+  { featureType: "poi", elementType: "all", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", elementType: "all", stylers: [{ visibility: "off" }] },
+  { featureType: "administrative", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "landscape", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "water", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { featureType: "road.highway", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "road.arterial", elementType: "labels", stylers: [{ visibility: "off" }] },
+  { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+  { featureType: "road.local", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
+];
+
 export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
   const mapRef = useRef<google.maps.Map | null>(null);
   // Use state (not just ref) so components re-render when the map is initialized
@@ -27,27 +41,7 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
           streetViewControl: false,
           fullscreenControl: false,
           gestureHandling: "greedy",
-          styles: [
-            // Hide all POIs (businesses, restaurants, parks, landmarks, etc.)
-            { featureType: "poi", elementType: "all", stylers: [{ visibility: "off" }] },
-            // Hide transit (bus stops, subway, rail)
-            { featureType: "transit", elementType: "all", stylers: [{ visibility: "off" }] },
-            // Hide all administrative labels (city names, neighborhoods, land parcels)
-            { featureType: "administrative", elementType: "labels", stylers: [{ visibility: "off" }] },
-            // Hide landscape labels
-            { featureType: "landscape", elementType: "labels", stylers: [{ visibility: "off" }] },
-            // Hide water labels
-            { featureType: "water", elementType: "labels", stylers: [{ visibility: "off" }] },
-            // Hide highway shields & road icons
-            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-            // Hide highway labels
-            { featureType: "road.highway", elementType: "labels", stylers: [{ visibility: "off" }] },
-            // Hide arterial road labels
-            { featureType: "road.arterial", elementType: "labels", stylers: [{ visibility: "off" }] },
-            // Local street names only — light gray
-            { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-            { featureType: "road.local", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
-          ],
+          styles: MAP_STYLES,
         });
 
         mapRef.current = map;

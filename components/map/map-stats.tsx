@@ -1,5 +1,6 @@
 "use client";
 
+import { memo } from "react";
 import { MapPin, Eye } from "lucide-react";
 
 interface MapStatsProps {
@@ -7,7 +8,7 @@ interface MapStatsProps {
   visible: number;
 }
 
-export function MapStats({ total, visible }: MapStatsProps) {
+export const MapStats = memo(function MapStats({ total, visible }: MapStatsProps) {
   return (
     <div className="flex items-center gap-3 text-xs text-gray-500">
       <span className="flex items-center gap-1">
@@ -22,4 +23,4 @@ export function MapStats({ total, visible }: MapStatsProps) {
       )}
     </div>
   );
-}
+});

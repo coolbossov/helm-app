@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useEffect } from "react";
+import { useRef, useEffect, useMemo, memo } from "react";
 import { MarkerClusterer, SuperClusterAlgorithm } from "@googlemaps/markerclusterer";
 import { useMap } from "@/lib/hooks/use-map";
 import {
@@ -79,7 +79,37 @@ function buildContactIcon(
   };
 }
 
-export function GoogleMapView({
+/* ─── Cluster renderer (module-level constant) ─── */
+const clusterRenderer = {
+  render({ count, position }: { count: number; position: google.maps.LatLng }) {
+    const size = Math.min(24 + Math.log2(count) * 8, 56);
+    return new google.maps.Marker({
+      position,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        fillColor: "#2563eb",
+        fillOpacity: 0.95,
+        strokeColor: "#ffffff",
+        strokeWeight: 3,
+        scale: size / 2,
+      },
+      label: {
+        text: count > 999 ? `${(count / 1000).toFixed(1)}k` : String(count),
+        color: "#ffffff",
+        fontWeight: "700",
+        fontSize: "12px",
+      },
+      zIndex: 999,
+    });
+  },
+};
+
+/* ─── Simplified-map CSS filter (module-level constant — Fix 11/12) ─── */
+const SIMPLIFIED_STYLE: React.CSSProperties = {
+  filter: "grayscale(0.6) brightness(1.08) contrast(0.92)",
+};
+
+export const GoogleMapView = memo(function GoogleMapView({
   contacts,
   onMarkerClick,
   selectedId,
@@ -104,6 +134,24 @@ export function GoogleMapView({
   const routeOverlaysRef = useRef<google.maps.Marker[]>([]);
   const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
 
+  /* ─── Fix 6: O(1) contact lookup map ─── */
+  const contactById = useMemo(() => {
+    const m = new Map<string, ContactMarkerData>();
+    for (const c of contacts) m.set(c.id, c);
+    return m;
+  }, [contacts]);
+
+  /* ─── Fix 2: Stable callback ref — effect never depends on onMarkerClick identity ─── */
+  const onMarkerClickRef = useRef(onMarkerClick);
+  useEffect(() => { onMarkerClickRef.current = onMarkerClick; }, [onMarkerClick]);
+
+  const onPlaceClickRef = useRef(onPlaceClick);
+  useEffect(() => { onPlaceClickRef.current = onPlaceClick; }, [onPlaceClick]);
+
+  const onCenterChangeRef = useRef(onCenterChange);
+  useEffect(() => { onCenterChangeRef.current = onCenterChange; }, [onCenterChange]);
+
+  /* ─── Fix 1a: Create markers ONLY when contacts change (not on settings/callback change) ─── */
   useEffect(() => {
     if (!map || !ready) return;
 
@@ -112,13 +160,15 @@ export function GoogleMapView({
     markerByIdRef.current.clear();
     if (clustererRef.current) clustererRef.current.clearMarkers();
 
+    const currentSettings = settings; // capture for initial icon build
+
     const newMarkers = contacts.map((contact) => {
       const marker = new google.maps.Marker({
         position: { lat: contact.latitude, lng: contact.longitude },
         title: contact.account_name || contact.last_name,
-        icon: buildContactIcon(contact, settings, contact.id === selectedIdRef.current),
+        icon: buildContactIcon(contact, currentSettings, contact.id === selectedIdRef.current),
       });
-      marker.addListener("click", () => onMarkerClick(contact));
+      marker.addListener("click", () => onMarkerClickRef.current(contact));
       markerByIdRef.current.set(contact.id, marker);
       return marker;
     });
@@ -132,29 +182,7 @@ export function GoogleMapView({
         maxZoom: CLUSTER_MAX_ZOOM,
         radius: 80,
       }),
-      renderer: {
-        render({ count, position }) {
-          const size = Math.min(24 + Math.log2(count) * 8, 56);
-          return new google.maps.Marker({
-            position,
-            icon: {
-              path: google.maps.SymbolPath.CIRCLE,
-              fillColor: "#2563eb",
-              fillOpacity: 0.95,
-              strokeColor: "#ffffff",
-              strokeWeight: 3,
-              scale: size / 2,
-            },
-            label: {
-              text: count > 999 ? `${(count / 1000).toFixed(1)}k` : String(count),
-              color: "#ffffff",
-              fontWeight: "700",
-              fontSize: "12px",
-            },
-            zIndex: 999,
-          });
-        },
-      },
+      renderer: clusterRenderer,
     });
 
     return () => {
@@ -162,12 +190,29 @@ export function GoogleMapView({
       markerByIdRef.current.clear();
       if (clustererRef.current) clustererRef.current.clearMarkers();
     };
-  }, [map, ready, contacts, onMarkerClick, settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- contacts only; settings handled by style-update effect
+  }, [map, ready, contacts]);
 
+  /* ─── Fix 1b: Update marker styles in-place when settings change (no teardown) ─── */
+  useEffect(() => {
+    if (!map || !ready || markersRef.current.length === 0) return;
+
+    for (const [id, marker] of markerByIdRef.current) {
+      const contact = contactById.get(id);
+      if (!contact) continue;
+      marker.setIcon(buildContactIcon(contact, settings, id === selectedIdRef.current));
+    }
+    // Force the clusterer to repaint with the updated markers
+    if (clustererRef.current) {
+      clustererRef.current.render();
+    }
+  }, [map, ready, settings, contactById]);
+
+  /* ─── Selection highlight — uses O(1) lookup ─── */
   useEffect(() => {
     const prevId = selectedIdRef.current;
     if (prevId) {
-      const prevContact = contacts.find((c) => c.id === prevId);
+      const prevContact = contactById.get(prevId);
       const prevMarker = markerByIdRef.current.get(prevId);
       if (prevContact && prevMarker) {
         prevMarker.setIcon(buildContactIcon(prevContact, settings, false));
@@ -176,7 +221,7 @@ export function GoogleMapView({
     }
 
     if (selectedId) {
-      const nextContact = contacts.find((c) => c.id === selectedId);
+      const nextContact = contactById.get(selectedId);
       const nextMarker = markerByIdRef.current.get(selectedId);
       if (nextContact && nextMarker) {
         nextMarker.setIcon(buildContactIcon(nextContact, settings, true));
@@ -185,8 +230,9 @@ export function GoogleMapView({
     }
 
     selectedIdRef.current = selectedId;
-  }, [selectedId, contacts, settings]);
+  }, [selectedId, contactById, settings]);
 
+  /* ─── Map click listener ─── */
   useEffect(() => {
     if (!map || !ready) return;
     if (mapClickListenerRef.current) {
@@ -206,15 +252,19 @@ export function GoogleMapView({
     };
   }, [map, ready, onMapClick]);
 
+  /* ─── Fix 4 (partial): Center change uses stable ref ─── */
   useEffect(() => {
-    if (!map || !ready || !onCenterChange) return;
+    if (!map || !ready) return;
     const listener = map.addListener("idle", () => {
+      const cb = onCenterChangeRef.current;
+      if (!cb) return;
       const c = map.getCenter();
-      if (c) onCenterChange({ lat: c.lat(), lng: c.lng() });
+      if (c) cb({ lat: c.lat(), lng: c.lng() });
     });
     return () => listener.remove();
-  }, [map, ready, onCenterChange]);
+  }, [map, ready]);
 
+  /* ─── Auto-plan pins ─── */
   useEffect(() => {
     if (!map || !ready) return;
     autoPlanMarkersRef.current.forEach((m) => m.setMap(null));
@@ -267,6 +317,7 @@ export function GoogleMapView({
     };
   }, [map, ready, autoPlanPins]);
 
+  /* ─── Route stop overlays — uses O(1) lookup ─── */
   useEffect(() => {
     if (!map || !ready) return;
     routeOverlaysRef.current.forEach((m) => m.setMap(null));
@@ -276,7 +327,7 @@ export function GoogleMapView({
 
     routeOverlaysRef.current = routeStopIds
       .map((id, index) => {
-        const contact = contacts.find((c) => c.id === id);
+        const contact = contactById.get(id);
         if (!contact) return null;
         return new google.maps.Marker({
           position: { lat: contact.latitude, lng: contact.longitude },
@@ -305,8 +356,9 @@ export function GoogleMapView({
       routeOverlaysRef.current.forEach((m) => m.setMap(null));
       routeOverlaysRef.current = [];
     };
-  }, [map, ready, routeStopIds, contacts]);
+  }, [map, ready, routeStopIds, contactById]);
 
+  /* ─── Discovery place markers — uses stable ref for callback ─── */
   useEffect(() => {
     if (!map || !ready) return;
     placeMarkersRef.current.forEach((m) => m.setMap(null));
@@ -330,9 +382,7 @@ export function GoogleMapView({
         },
         zIndex: 1000,
       });
-      if (onPlaceClick) {
-        marker.addListener("click", () => onPlaceClick(place));
-      }
+      marker.addListener("click", () => onPlaceClickRef.current?.(place));
       return marker;
     });
 
@@ -340,7 +390,7 @@ export function GoogleMapView({
       placeMarkersRef.current.forEach((m) => m.setMap(null));
       placeMarkersRef.current = [];
     };
-  }, [map, ready, placeMarkers, onPlaceClick]);
+  }, [map, ready, placeMarkers]);
 
   if (error) {
     return (
@@ -355,11 +405,7 @@ export function GoogleMapView({
       <div
         ref={containerRef}
         className="h-full w-full"
-        style={
-          settings.simplifiedMap
-            ? { filter: "grayscale(0.6) brightness(1.08) contrast(0.92)" }
-            : undefined
-        }
+        style={settings.simplifiedMap ? SIMPLIFIED_STYLE : undefined}
       />
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
@@ -368,4 +414,4 @@ export function GoogleMapView({
       )}
     </div>
   );
-}
+});

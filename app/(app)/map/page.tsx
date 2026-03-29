@@ -1,18 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo, useRef } from "react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Filter, Route, Telescope } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
-import { FilterPanel } from "@/components/map/filter-panel";
-import { ContactDetail } from "@/components/map/contact-detail";
 import { SearchBar } from "@/components/map/search-bar";
 import { MapStats } from "@/components/map/map-stats";
 import { MapSettingsButton } from "@/components/map/map-settings";
 import { CoverageLegend } from "@/components/map/coverage-legend";
 import { VisitStatusLegend } from "@/components/map/visit-status-legend";
-import { RouteBuilder } from "@/components/map/route-builder";
-import { DiscoverPanel } from "@/components/map/discover-panel";
 import { BottomSheet, Spinner } from "@/components/ui";
 import { useContacts, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
@@ -20,6 +17,24 @@ import { contactsInCorridor } from "@/lib/utils/geo";
 import { SA_CENTER } from "@/types/maps";
 import type { ContactMarkerData } from "@/types";
 import type { DiscoveryResult } from "@/app/api/leads/discover/route";
+
+/* ─── Fix 8: Dynamic imports for heavy panels ─── */
+const FilterPanel = dynamic(() =>
+  import("@/components/map/filter-panel").then((m) => ({ default: m.FilterPanel })),
+  { loading: () => <div className="p-4"><Spinner /></div> }
+);
+const ContactDetail = dynamic(() =>
+  import("@/components/map/contact-detail").then((m) => ({ default: m.ContactDetail })),
+  { loading: () => <div className="p-4"><Spinner /></div> }
+);
+const RouteBuilder = dynamic(() =>
+  import("@/components/map/route-builder").then((m) => ({ default: m.RouteBuilder })),
+  { loading: () => <div className="p-4"><Spinner /></div> }
+);
+const DiscoverPanel = dynamic(() =>
+  import("@/components/map/discover-panel").then((m) => ({ default: m.DiscoverPanel })),
+  { loading: () => <div className="p-4"><Spinner /></div> }
+);
 
 interface LatLng {
   lat: number;
@@ -48,7 +63,20 @@ export default function MapPage() {
   const [discoverOpen, setDiscoverOpen] = useState(false);
   const [discoverMobileOpen, setDiscoverMobileOpen] = useState(false);
   const [discoveryResults, setDiscoveryResults] = useState<DiscoveryResult[]>([]);
-  const [mapCenter, setMapCenter] = useState(SA_CENTER);
+
+  /* ─── Fix 4: mapCenter stored in ref by default; only promoted to state when discover panel is open ─── */
+  const mapCenterRef = useRef(SA_CENTER);
+  const [mapCenter, setMapCenterState] = useState(SA_CENTER);
+  const discoverOpenRef = useRef(false);
+  discoverOpenRef.current = discoverOpen || discoverMobileOpen;
+
+  const handleCenterChange = useCallback((center: { lat: number; lng: number }) => {
+    mapCenterRef.current = center;
+    // Only trigger a re-render when the discover panel is open (it needs the center)
+    if (discoverOpenRef.current) {
+      setMapCenterState(center);
+    }
+  }, []);
 
   // Route builder state
   const [routeBuilderOpen, setRouteBuilderOpen] = useState(false);
@@ -143,6 +171,8 @@ export default function MapPage() {
   };
 
   const openDiscover = () => {
+    // Sync ref → state so DiscoverPanel gets the latest center immediately
+    setMapCenterState(mapCenterRef.current);
     if (window.innerWidth < 640) {
       setDiscoverMobileOpen(true);
     } else {
@@ -173,14 +203,14 @@ export default function MapPage() {
   };
 
   const handleRouteReorder = useCallback((from: number, to: number) => {
-    if (to < 0 || to >= routeStops.length) return;
     setRouteStops((prev) => {
+      if (to < 0 || to >= prev.length) return prev;
       const next = [...prev];
       const [item] = next.splice(from, 1);
       next.splice(to, 0, item);
       return next;
     });
-  }, [routeStops.length]);
+  }, []);
 
   const handleAddAllFiltered = useCallback(() => {
     setRouteStops((prev) => {
@@ -224,8 +254,30 @@ export default function MapPage() {
     }
   }, [routeStops, router]);
 
-  // IDs of selected route stops for map highlighting
-  const routeStopIds = routeStops.map((s) => s.id);
+  /* ─── Fix 3: Memoize derived arrays passed as props to GoogleMapView ─── */
+  const routeStopIds = useMemo(() => routeStops.map((s) => s.id), [routeStops]);
+
+  const discoveryPlaceMarkers = useMemo(
+    () => discoveryResults.map((r) => ({
+      place_id: r.place_id,
+      name: r.name,
+      lat: r.lat,
+      lng: r.lng,
+    })),
+    [discoveryResults]
+  );
+
+  const autoPlanPins = useMemo(
+    () => autoPlanActive
+      ? { start: autoPlanStart ?? undefined, end: autoPlanEnd ?? undefined }
+      : undefined,
+    [autoPlanActive, autoPlanStart, autoPlanEnd]
+  );
+
+  const onMapClick = useMemo(
+    () => autoPlanActive ? handleMapClickWrapper : undefined,
+    [autoPlanActive, handleMapClickWrapper]
+  );
 
   if (loading) {
     return (
@@ -264,14 +316,6 @@ export default function MapPage() {
       onSaveRoute={handleSaveRoute}
     />
   );
-
-  // Discovery results as placeMarkers for the map (same shape: place_id, name, lat, lng)
-  const discoveryPlaceMarkers = discoveryResults.map((r) => ({
-    place_id: r.place_id,
-    name: r.name,
-    lat: r.lat,
-    lng: r.lng,
-  }));
 
   const discoverPanel = (
     <DiscoverPanel
@@ -426,15 +470,11 @@ export default function MapPage() {
           onMarkerClick={handleMarkerClick}
           selectedId={selectedId}
           settings={settings}
-          onMapClick={autoPlanActive ? handleMapClickWrapper : undefined}
-          autoPlanPins={
-            autoPlanActive
-              ? { start: autoPlanStart ?? undefined, end: autoPlanEnd ?? undefined }
-              : undefined
-          }
+          onMapClick={onMapClick}
+          autoPlanPins={autoPlanPins}
           placeMarkers={discoveryPlaceMarkers}
           routeStopIds={routeStopIds}
-          onCenterChange={setMapCenter}
+          onCenterChange={handleCenterChange}
         />
 
         {/* Empty state when filters produce 0 results */}
