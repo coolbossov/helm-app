@@ -23,6 +23,8 @@ interface PlaceMarker {
   name: string;
   lat: number;
   lng: number;
+  selected: boolean;
+  inCrm: boolean;
 }
 
 interface GoogleMapViewProps {
@@ -30,13 +32,16 @@ interface GoogleMapViewProps {
   onMarkerClick: (contact: ContactMarkerData) => void;
   selectedId: string | null;
   settings: MapSettings;
-  simplified?: boolean;
+  findLeadsMode?: boolean;
   onMapClick?: (lat: number, lng: number) => void;
   autoPlanPins?: AutoPlanPins;
-  placeMarkers?: PlaceMarker[];
-  onPlaceClick?: (place: PlaceMarker) => void;
+  searchPins?: PlaceMarker[];
+  onSearchPinClick?: (placeId: string) => void;
+  showSearchAreaButton?: boolean;
+  onSearchAreaRequest?: () => void;
   routeStopIds?: string[];
   onCenterChange?: (center: { lat: number; lng: number }) => void;
+  onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
 function getCoverageRing(contact: ContactMarkerData): string {
@@ -114,12 +119,16 @@ export const GoogleMapView = memo(function GoogleMapView({
   onMarkerClick,
   selectedId,
   settings,
+  findLeadsMode,
   onMapClick,
   autoPlanPins,
-  placeMarkers,
-  onPlaceClick,
+  searchPins,
+  onSearchPinClick,
+  showSearchAreaButton,
+  onSearchAreaRequest,
   routeStopIds = [],
   onCenterChange,
+  onBoundsChange,
 }: GoogleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { map, ready, error } = useMap(containerRef);
@@ -145,11 +154,14 @@ export const GoogleMapView = memo(function GoogleMapView({
   const onMarkerClickRef = useRef(onMarkerClick);
   useEffect(() => { onMarkerClickRef.current = onMarkerClick; }, [onMarkerClick]);
 
-  const onPlaceClickRef = useRef(onPlaceClick);
-  useEffect(() => { onPlaceClickRef.current = onPlaceClick; }, [onPlaceClick]);
+  const onSearchPinClickRef = useRef(onSearchPinClick);
+  useEffect(() => { onSearchPinClickRef.current = onSearchPinClick; }, [onSearchPinClick]);
 
   const onCenterChangeRef = useRef(onCenterChange);
   useEffect(() => { onCenterChangeRef.current = onCenterChange; }, [onCenterChange]);
+
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  useEffect(() => { onBoundsChangeRef.current = onBoundsChange; }, [onBoundsChange]);
 
   /* ─── Fix 1a: Create markers ONLY when contacts change (not on settings/callback change) ─── */
   useEffect(() => {
@@ -256,10 +268,20 @@ export const GoogleMapView = memo(function GoogleMapView({
   useEffect(() => {
     if (!map || !ready) return;
     const listener = map.addListener("idle", () => {
-      const cb = onCenterChangeRef.current;
-      if (!cb) return;
       const c = map.getCenter();
-      if (c) cb({ lat: c.lat(), lng: c.lng() });
+      if (c) onCenterChangeRef.current?.({ lat: c.lat(), lng: c.lng() });
+
+      const b = map.getBounds();
+      if (b) {
+        const northEast = b.getNorthEast();
+        const southWest = b.getSouthWest();
+        onBoundsChangeRef.current?.({
+          north: northEast.lat(),
+          east: northEast.lng(),
+          south: southWest.lat(),
+          west: southWest.lng(),
+        });
+      }
     });
     return () => listener.remove();
   }, [map, ready]);
@@ -358,31 +380,34 @@ export const GoogleMapView = memo(function GoogleMapView({
     };
   }, [map, ready, routeStopIds, contactById]);
 
-  /* ─── Discovery place markers — uses stable ref for callback ─── */
+  /* ─── Find-leads search pins — uses stable ref for callback ─── */
   useEffect(() => {
     if (!map || !ready) return;
     placeMarkersRef.current.forEach((m) => m.setMap(null));
     placeMarkersRef.current = [];
 
-    if (!placeMarkers || placeMarkers.length === 0) return;
+    if (!searchPins || searchPins.length === 0) return;
 
-    placeMarkersRef.current = placeMarkers.map((place) => {
+    placeMarkersRef.current = searchPins.map((place) => {
+      const fillColor = place.inCrm ? "#9ca3af" : "#f97316";
+      const strokeColor = place.selected ? "#2563eb" : "#ffffff";
+      const strokeWeight = place.selected ? 4 : 2;
       const marker = new google.maps.Marker({
         position: { lat: place.lat, lng: place.lng },
         map,
         title: place.name,
         icon: {
           path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
-          fillColor: "#f97316",
+          fillColor,
           fillOpacity: 1,
-          strokeColor: "#ffffff",
-          strokeWeight: 2,
+          strokeColor,
+          strokeWeight,
           scale: 5,
           rotation: 45,
         },
-        zIndex: 1000,
+        zIndex: place.selected ? 1003 : 1000,
       });
-      marker.addListener("click", () => onPlaceClickRef.current?.(place));
+      marker.addListener("click", () => onSearchPinClickRef.current?.(place.place_id));
       return marker;
     });
 
@@ -390,7 +415,7 @@ export const GoogleMapView = memo(function GoogleMapView({
       placeMarkersRef.current.forEach((m) => m.setMap(null));
       placeMarkersRef.current = [];
     };
-  }, [map, ready, placeMarkers]);
+  }, [map, ready, searchPins]);
 
   if (error) {
     return (
@@ -405,8 +430,18 @@ export const GoogleMapView = memo(function GoogleMapView({
       <div
         ref={containerRef}
         className="h-full w-full"
-        style={settings.simplifiedMap ? SIMPLIFIED_STYLE : undefined}
+        style={settings.simplifiedMap || findLeadsMode ? SIMPLIFIED_STYLE : undefined}
       />
+      {showSearchAreaButton && (
+        <div className="pointer-events-none absolute left-1/2 top-20 z-10 -translate-x-1/2 sm:top-24">
+          <button
+            onClick={onSearchAreaRequest}
+            className="pointer-events-auto rounded-full bg-white px-4 py-2 text-xs font-semibold text-blue-700 shadow-md ring-1 ring-blue-200 hover:bg-blue-50"
+          >
+            Search this area
+          </button>
+        </div>
+      )}
       {!ready && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-100">
           <Spinner size="lg" />

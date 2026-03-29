@@ -14,7 +14,6 @@ import { BottomSheet, Spinner } from "@/components/ui";
 import { useContacts, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
 import { contactsInCorridor } from "@/lib/utils/geo";
-import { SA_CENTER } from "@/types/maps";
 import type { ContactMarkerData } from "@/types";
 import type { DiscoveryResult } from "@/app/api/leads/discover/route";
 
@@ -31,8 +30,8 @@ const RouteBuilder = dynamic(() =>
   import("@/components/map/route-builder").then((m) => ({ default: m.RouteBuilder })),
   { loading: () => <div className="p-4"><Spinner /></div> }
 );
-const DiscoverPanel = dynamic(() =>
-  import("@/components/map/discover-panel").then((m) => ({ default: m.DiscoverPanel })),
+const FindLeadsPanel = dynamic(() =>
+  import("@/components/map/find-leads-panel").then((m) => ({ default: m.FindLeadsPanel })),
   { loading: () => <div className="p-4"><Spinner /></div> }
 );
 
@@ -59,24 +58,22 @@ export default function MapPage() {
   const [autoPlanEnd, setAutoPlanEnd] = useState<LatLng | null>(null);
   const [autoPlanLoading, setAutoPlanLoading] = useState(false);
 
-  // Discover panel state
-  const [discoverOpen, setDiscoverOpen] = useState(false);
-  const [discoverMobileOpen, setDiscoverMobileOpen] = useState(false);
-  const [discoveryResults, setDiscoveryResults] = useState<DiscoveryResult[]>([]);
+  // Find Leads mode state
+  const [findLeadsOpen, setFindLeadsOpen] = useState(false);
+  const [findLeadsMobileOpen, setFindLeadsMobileOpen] = useState(false);
+  const [searchResults, setSearchResults] = useState<DiscoveryResult[]>([]);
+  const [selectedSearchIds, setSelectedSearchIds] = useState<Set<string>>(new Set());
+  const [hasSearchedFindLeads, setHasSearchedFindLeads] = useState(false);
+  const [searchAreaRequestId, setSearchAreaRequestId] = useState(0);
+  const [findLeadsMapMoved, setFindLeadsMapMoved] = useState(false);
+  const mapBoundsRef = useRef<{ north: number; south: number; east: number; west: number } | null>(
+    null
+  );
 
-  /* ─── Fix 4: mapCenter stored in ref by default; only promoted to state when discover panel is open ─── */
-  const mapCenterRef = useRef(SA_CENTER);
-  const [mapCenter, setMapCenterState] = useState(SA_CENTER);
-  const discoverOpenRef = useRef(false);
-  discoverOpenRef.current = discoverOpen || discoverMobileOpen;
-
-  const handleCenterChange = useCallback((center: { lat: number; lng: number }) => {
-    mapCenterRef.current = center;
-    // Only trigger a re-render when the discover panel is open (it needs the center)
-    if (discoverOpenRef.current) {
-      setMapCenterState(center);
-    }
-  }, []);
+  const handleBoundsChange = useCallback((bounds: { north: number; south: number; east: number; west: number }) => {
+    mapBoundsRef.current = bounds;
+    if (hasSearchedFindLeads) setFindLeadsMapMoved(true);
+  }, [hasSearchedFindLeads]);
 
   // Route builder state
   const [routeBuilderOpen, setRouteBuilderOpen] = useState(false);
@@ -170,25 +167,30 @@ export default function MapPage() {
     }
   };
 
-  const openDiscover = () => {
-    // Sync ref → state so DiscoverPanel gets the latest center immediately
-    setMapCenterState(mapCenterRef.current);
+  const openFindLeads = () => {
+    // Mutual exclusion: close route builder if open
+    closeRouteBuilder();
     if (window.innerWidth < 640) {
-      setDiscoverMobileOpen(true);
+      setFindLeadsMobileOpen(true);
     } else {
-      setDiscoverOpen(true);
+      setFindLeadsOpen(true);
       setSelectedId(null);
     }
   };
 
-  const closeDiscover = () => {
-    setDiscoverOpen(false);
-    setDiscoverMobileOpen(false);
-    setDiscoveryResults([]);
+  const closeFindLeads = () => {
+    setFindLeadsOpen(false);
+    setFindLeadsMobileOpen(false);
+    setSearchResults([]);
+    setSelectedSearchIds(new Set());
+    setHasSearchedFindLeads(false);
+    setFindLeadsMapMoved(false);
   };
 
   // Route builder helpers
   const openRouteBuilder = () => {
+    // Mutual exclusion: close find leads if open
+    closeFindLeads();
     if (window.innerWidth < 640) {
       setRouteBuilderMobileOpen(true);
     } else {
@@ -257,14 +259,16 @@ export default function MapPage() {
   /* ─── Fix 3: Memoize derived arrays passed as props to GoogleMapView ─── */
   const routeStopIds = useMemo(() => routeStops.map((s) => s.id), [routeStops]);
 
-  const discoveryPlaceMarkers = useMemo(
-    () => discoveryResults.map((r) => ({
+  const searchPins = useMemo(
+    () => searchResults.map((r) => ({
       place_id: r.place_id,
       name: r.name,
       lat: r.lat,
       lng: r.lng,
+      selected: selectedSearchIds.has(r.place_id),
+      inCrm: r.already_in_crm,
     })),
-    [discoveryResults]
+    [searchResults, selectedSearchIds]
   );
 
   const autoPlanPins = useMemo(
@@ -317,19 +321,28 @@ export default function MapPage() {
     />
   );
 
-  const discoverPanel = (
-    <DiscoverPanel
-      center={mapCenter}
-      onClose={closeDiscover}
-      onLeadAdded={refetch}
-      onResultsChange={setDiscoveryResults}
+  const findLeadsPanel = (
+    <FindLeadsPanel
+      bounds={mapBoundsRef.current}
+      results={searchResults}
+      selectedIds={selectedSearchIds}
+      searchAreaRequestId={searchAreaRequestId}
+      onClose={closeFindLeads}
+      onLeadsAdded={refetch}
+      onResultsChange={(results) => {
+        setSearchResults(results);
+        setSelectedSearchIds(new Set());
+        setHasSearchedFindLeads(true);
+      }}
+      onSelectedIdsChange={setSelectedSearchIds}
+      onSearchCompleted={() => setFindLeadsMapMoved(false)}
     />
   );
 
   return (
     <div className="relative flex h-full">
       {/* Desktop filter panel */}
-      {filterOpen && !routeBuilderOpen && !discoverOpen && (
+      {filterOpen && !routeBuilderOpen && !findLeadsOpen && (
         <div className="hidden w-[280px] shrink-0 border-r border-gray-200 sm:block">
           <FilterPanel
             filters={filters}
@@ -374,20 +387,20 @@ export default function MapPage() {
             className="flex-1"
           />
 
-          {/* Discover toggle */}
+          {/* Find Leads toggle */}
           <button
-            onClick={openDiscover}
+            onClick={openFindLeads}
             className={`flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 shadow-sm transition-colors sm:px-3 ${
-              discoverOpen || discoverMobileOpen
+              findLeadsOpen || findLeadsMobileOpen
                 ? "border-orange-500 bg-orange-500 text-white"
                 : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
             }`}
-            title="Discover nearby leads"
+            title="Find nearby leads"
           >
             <Telescope className="h-4 w-4" />
             <span className={`hidden text-xs font-medium sm:inline ${
-              discoverOpen || discoverMobileOpen ? "text-white" : "text-gray-600"
-            }`}>Discover</span>
+              findLeadsOpen || findLeadsMobileOpen ? "text-white" : "text-gray-600"
+            }`}>Find Leads</span>
           </button>
 
           {/* Route builder toggle */}
@@ -438,10 +451,10 @@ export default function MapPage() {
           </div>
         )}
 
-        {/* Discover mode hint banner */}
-        {(discoverOpen || discoverMobileOpen) && discoveryResults.length > 0 && (
+        {/* Find Leads mode hint banner */}
+        {(findLeadsOpen || findLeadsMobileOpen) && searchResults.length > 0 && (
           <div className="absolute top-16 left-1/2 z-10 -translate-x-1/2 rounded-full bg-orange-500 px-4 py-2 text-xs font-medium text-white shadow-lg sm:top-[72px]">
-            {discoveryResults.length} results — orange pins on map
+            {searchResults.length} results - orange pins on map
           </div>
         )}
 
@@ -470,11 +483,25 @@ export default function MapPage() {
           onMarkerClick={handleMarkerClick}
           selectedId={selectedId}
           settings={settings}
+          findLeadsMode={findLeadsOpen || findLeadsMobileOpen}
           onMapClick={onMapClick}
           autoPlanPins={autoPlanPins}
-          placeMarkers={discoveryPlaceMarkers}
+          searchPins={searchPins}
+          onSearchPinClick={(placeId) => {
+            if (!(findLeadsOpen || findLeadsMobileOpen)) return;
+            const target = searchResults.find((result) => result.place_id === placeId);
+            if (!target || target.already_in_crm) return;
+            setSelectedSearchIds((prev) => {
+              const next = new Set(prev);
+              if (next.has(placeId)) next.delete(placeId);
+              else next.add(placeId);
+              return next;
+            });
+          }}
+          showSearchAreaButton={(findLeadsOpen || findLeadsMobileOpen) && hasSearchedFindLeads && findLeadsMapMoved}
+          onSearchAreaRequest={() => setSearchAreaRequestId((prev) => prev + 1)}
           routeStopIds={routeStopIds}
-          onCenterChange={handleCenterChange}
+          onBoundsChange={handleBoundsChange}
         />
 
         {/* Empty state when filters produce 0 results */}
@@ -487,22 +514,22 @@ export default function MapPage() {
         )}
       </div>
 
-      {/* Desktop discover panel */}
-      {discoverOpen && (
-        <div className="hidden w-[360px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
-          {discoverPanel}
+      {/* Desktop find leads panel */}
+      {findLeadsOpen && (
+        <div className="hidden w-[400px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
+          {findLeadsPanel}
         </div>
       )}
 
       {/* Desktop route builder panel */}
-      {!discoverOpen && routeBuilderOpen && (
+      {!findLeadsOpen && routeBuilderOpen && (
         <div className="hidden w-[320px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
           {routeBuilderPanel}
         </div>
       )}
 
-      {/* Desktop detail panel (only when route builder and discover are closed) */}
-      {!routeBuilderOpen && !discoverOpen && selectedId && (
+      {/* Desktop detail panel (only when route builder and find leads are closed) */}
+      {!routeBuilderOpen && !findLeadsOpen && selectedId && (
         <div className="hidden w-[400px] shrink-0 overflow-y-auto border-l border-gray-200 bg-white sm:block">
           <ContactDetail contactId={selectedId} onClose={handleCloseDetail} />
         </div>
@@ -526,7 +553,7 @@ export default function MapPage() {
       {/* Mobile detail bottom sheet — hidden on desktop where right sidebar is used */}
       <div className="sm:hidden">
         <BottomSheet
-          open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen && !discoverMobileOpen}
+          open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen && !findLeadsMobileOpen}
           onClose={handleCloseDetail}
           size="half"
         >
@@ -544,14 +571,14 @@ export default function MapPage() {
         {routeBuilderPanel}
       </BottomSheet>
 
-      {/* Mobile discover bottom sheet */}
+      {/* Mobile find leads bottom sheet */}
       <BottomSheet
-        open={discoverMobileOpen}
-        onClose={closeDiscover}
-        title="Discover Leads"
+        open={findLeadsMobileOpen}
+        onClose={closeFindLeads}
+        title="Find Leads"
         size="full"
       >
-        {discoverPanel}
+        {findLeadsPanel}
       </BottomSheet>
     </div>
   );
