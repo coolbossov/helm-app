@@ -392,7 +392,7 @@ export default function MapPage() {
             onClick={openFindLeads}
             className={`flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border px-2 shadow-sm transition-colors sm:px-3 ${
               findLeadsOpen || findLeadsMobileOpen
-                ? "border-orange-500 bg-orange-500 text-white"
+                ? "border-pink-600 bg-pink-600 text-white"
                 : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
             }`}
             title="Find nearby leads"
@@ -453,8 +453,8 @@ export default function MapPage() {
 
         {/* Find Leads mode hint banner */}
         {(findLeadsOpen || findLeadsMobileOpen) && searchResults.length > 0 && (
-          <div className="absolute top-16 left-1/2 z-10 -translate-x-1/2 rounded-full bg-orange-500 px-4 py-2 text-xs font-medium text-white shadow-lg sm:top-[72px]">
-            {searchResults.length} results - orange pins on map
+          <div className="absolute top-16 left-1/2 z-10 -translate-x-1/2 rounded-full bg-pink-600 px-4 py-2 text-xs font-medium text-white shadow-lg sm:top-[72px]">
+            {searchResults.length} results — pink pins on map
           </div>
         )}
 
