@@ -18,6 +18,10 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
       .then(() => {
         if (!containerRef.current) return;
 
+        // Vector maps (mapId) use cloud-based styling configured in Google Cloud Console.
+        // The inline `styles` property is incompatible with vector maps and causes errors.
+        // To customize POI/transit visibility, create a Map Style in:
+        // Google Cloud Console → Maps Platform → Map Styles
         const map = new google.maps.Map(containerRef.current, {
           center: SA_CENTER,
           zoom: DEFAULT_ZOOM,
@@ -28,18 +32,6 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
           streetViewControl: false,
           fullscreenControl: false,
           gestureHandling: "greedy",
-          styles: [
-            // Hide all points of interest (restaurants, shops, hospitals, parks, etc.)
-            { featureType: "poi", elementType: "all", stylers: [{ visibility: "off" }] },
-            // Hide transit (bus stops, subway lines, rail stations)
-            { featureType: "transit", elementType: "all", stylers: [{ visibility: "off" }] },
-            // Hide business icons on the road layer
-            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
-            // Tone down road labels (keep street names but lighter)
-            { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-            // Lighten water labels
-            { featureType: "water", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
-          ],
         });
 
         mapRef.current = map;
