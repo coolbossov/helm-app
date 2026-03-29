@@ -9,14 +9,67 @@ import {
 } from "./field-mappings";
 import type { ZohoContact } from "@/types";
 
-function buildAddress(contact: ZohoContact): string | null {
-  const parts = [
-    contact.Mailing_Street,
-    contact.Mailing_City,
-    contact.Mailing_State,
-    contact.Mailing_Zip,
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(", ") : null;
+export interface ContactChangeDetail {
+  name: string;
+  type: "created" | "updated" | "unchanged";
+  fieldsChanged?: string[];
+}
+
+export interface SyncResult {
+  synced: number;
+  created: number;
+  updated: number;
+  unchanged: number;
+  details: ContactChangeDetail[];
+}
+
+/** Fields to compare when diffing incoming vs existing contacts */
+const DIFF_FIELDS = [
+  "first_name",
+  "last_name",
+  "account_name",
+  "email",
+  "phone",
+  "mobile",
+  "website",
+  "mailing_street",
+  "mailing_city",
+  "mailing_state",
+  "mailing_zip",
+  "mailing_country",
+  "business_type",
+  "priority",
+  "lifecycle_stage",
+  "contacting_status",
+  "contacting_tips",
+  "prospecting_notes",
+] as const;
+
+/** Select clause for fetching existing contacts for diff comparison */
+const EXISTING_SELECT = ["zoho_id", ...DIFF_FIELDS].join(", ");
+
+function diffContact(
+  incoming: Record<string, unknown>,
+  existing: Record<string, unknown>,
+): string[] {
+  const changed: string[] = [];
+  for (const field of DIFF_FIELDS) {
+    const a = incoming[field];
+    const b = existing[field];
+    // Handle arrays (business_type) with JSON comparison
+    if (Array.isArray(a) || Array.isArray(b)) {
+      if (JSON.stringify(a ?? []) !== JSON.stringify(b ?? [])) {
+        changed.push(field);
+      }
+    } else if (String(a ?? "") !== String(b ?? "")) {
+      changed.push(field);
+    }
+  }
+  return changed;
+}
+
+function formatContactName(row: { first_name?: string | null; last_name: string }): string {
+  return row.first_name ? `${row.first_name} ${row.last_name}` : row.last_name;
 }
 
 function contactToRow(contact: ZohoContact) {
@@ -46,16 +99,14 @@ function contactToRow(contact: ZohoContact) {
   };
 }
 
-export async function syncAllContacts(): Promise<{
-  synced: number;
-  created: number;
-  updated: number;
-}> {
+export async function syncAllContacts(): Promise<SyncResult> {
   const supabase = createAdminClient();
   const contacts = await fetchAllContacts();
 
   let created = 0;
   let updated = 0;
+  let unchanged = 0;
+  const details: ContactChangeDetail[] = [];
 
   // Process in batches of 50
   for (let i = 0; i < contacts.length; i += 50) {
@@ -63,52 +114,55 @@ export async function syncAllContacts(): Promise<{
     const rows = batch.map(contactToRow);
     const zohoIds = batch.map((contact) => contact.id);
 
-    // Check which contacts already exist to distinguish creates from updates
+    // Fetch existing contacts with all comparable fields for diff
     const { data: existingContacts, error: existingError } = await supabase
       .from("synced_contacts")
-      .select("zoho_id")
-      .in("zoho_id", zohoIds);
+      .select(EXISTING_SELECT)
+      .in("zoho_id", zohoIds)
+      .returns<Array<Record<string, unknown>>>();
 
     if (existingError) {
       console.error("Select existing batch error:", existingError);
       throw new Error(`Failed to check existing contacts: ${existingError.message}`);
     }
 
-    const existingIds = new Set(
-      (existingContacts ?? []).map((row) => row.zoho_id),
+    // Build lookup by zoho_id for diff comparison
+    const existingMap = new Map<string, Record<string, unknown>>(
+      (existingContacts ?? []).map((row) => [String(row.zoho_id), row]),
     );
-    const batchCreated = batch.filter(
-      (contact) => !existingIds.has(contact.id),
-    ).length;
-    created += batchCreated;
+
+    // Diff each contact and collect details
+    for (let j = 0; j < batch.length; j++) {
+      const row = rows[j];
+      const existing = existingMap.get(row.zoho_id);
+      const name = formatContactName(row);
+
+      if (!existing) {
+        created++;
+        details.push({ name, type: "created" });
+      } else {
+        const fieldsChanged = diffContact(row, existing);
+        if (fieldsChanged.length > 0) {
+          updated++;
+          details.push({ name, type: "updated", fieldsChanged });
+        } else {
+          unchanged++;
+          details.push({ name, type: "unchanged" });
+        }
+      }
+    }
 
     // visit_status and last_visit_date are NOT in contactToRow() — they're app-managed
     // and will not be overwritten by Bigin syncs
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from("synced_contacts")
-      .upsert(rows, { onConflict: "zoho_id" })
-      .select("zoho_id");
+      .upsert(rows, { onConflict: "zoho_id" });
 
     if (error) {
       console.error("Upsert batch error:", error);
       throw new Error(`Failed to upsert contacts: ${error.message}`);
     }
-
-    // Count created vs updated based on pre-upsert existence check
-    if (data) {
-      updated += Math.max(data.length - batchCreated, 0);
-    }
   }
-
-  // Get contacts that need geocoding
-  const { data: needsGeocode } = await supabase
-    .from("synced_contacts")
-    .select("id")
-    .eq("geocode_status", "pending")
-    .not("mailing_street", "is", null)
-    .limit(1);
-
-  const hasUngeocodedContacts = (needsGeocode?.length ?? 0) > 0;
 
   // Mark contacts without any address as no_address
   await supabase
@@ -122,6 +176,8 @@ export async function syncAllContacts(): Promise<{
     synced: contacts.length,
     created,
     updated,
+    unchanged,
+    details,
   };
 }
 

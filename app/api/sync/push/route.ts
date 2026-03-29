@@ -30,5 +30,7 @@ export async function POST() {
     fields_failed: fieldResult.failed,
     activities_synced: activityResult.synced,
     activities_failed: activityResult.failed,
+    field_details: fieldResult.details,
+    activity_details: activityResult.details,
   });
 }

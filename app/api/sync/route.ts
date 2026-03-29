@@ -54,7 +54,11 @@ export async function POST() {
     return NextResponse.json({
       success: true,
       contacts_synced: syncResult.synced,
+      contacts_created: syncResult.created,
+      contacts_updated: syncResult.updated,
+      contacts_unchanged: syncResult.unchanged,
       contacts_geocoded: geocoded,
+      details: syncResult.details,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";
