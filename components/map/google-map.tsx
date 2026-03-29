@@ -139,21 +139,6 @@ export function GoogleMapView({
   // Route stop number overlay markers
   const routeOverlaysRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
-  // Auto-dismiss Google Maps error dialogs (e.g. "This page can't load Google Maps correctly")
-  // These are non-blocking warnings from AdvancedMarkerElement on raster fallback.
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const container = containerRef.current;
-    const observer = new MutationObserver(() => {
-      const dialog = container.querySelector('[role="alertdialog"]');
-      if (dialog instanceof HTMLElement) {
-        dialog.style.display = "none";
-      }
-    });
-    observer.observe(container, { childList: true, subtree: true });
-    return () => observer.disconnect();
-  }, []);
-
   // Build markers when map, contacts, settings, or coverageMap change
   useEffect(() => {
     if (!map || !ready) return;

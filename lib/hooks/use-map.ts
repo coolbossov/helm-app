@@ -4,11 +4,6 @@ import { useState, useCallback, useRef, useEffect } from "react";
 import { loadGoogleMaps } from "@/lib/google/maps-loader";
 import { SA_CENTER, DEFAULT_ZOOM } from "@/types/maps";
 
-// Map ID for vector map — required for AdvancedMarkerElement.
-// Cloud-based styling is configured in Google Cloud Console → Map Styles.
-// The styles property is NOT compatible with mapId (vector maps).
-const MAP_ID = "72aa8a78bc046c7f503dedc8";
-
 export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
   const mapRef = useRef<google.maps.Map | null>(null);
   // Use state (not just ref) so components re-render when the map is initialized
@@ -26,13 +21,33 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
         const map = new google.maps.Map(containerRef.current, {
           center: SA_CENTER,
           zoom: DEFAULT_ZOOM,
-          mapId: MAP_ID,
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,
           streetViewControl: false,
           fullscreenControl: false,
           gestureHandling: "greedy",
+          styles: [
+            // Hide all POIs (businesses, restaurants, parks, landmarks, etc.)
+            { featureType: "poi", elementType: "all", stylers: [{ visibility: "off" }] },
+            // Hide transit (bus stops, subway, rail)
+            { featureType: "transit", elementType: "all", stylers: [{ visibility: "off" }] },
+            // Hide all administrative labels (city names, neighborhoods, land parcels)
+            { featureType: "administrative", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Hide landscape labels
+            { featureType: "landscape", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Hide water labels
+            { featureType: "water", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Hide highway shields & road icons
+            { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+            // Hide highway labels
+            { featureType: "road.highway", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Hide arterial road labels
+            { featureType: "road.arterial", elementType: "labels", stylers: [{ visibility: "off" }] },
+            // Local street names only — light gray
+            { featureType: "road.local", elementType: "labels.text.fill", stylers: [{ color: "#9ca5b3" }] },
+            { featureType: "road.local", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }, { weight: 2 }] },
+          ],
         });
 
         mapRef.current = map;
