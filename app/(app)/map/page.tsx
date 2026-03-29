@@ -483,14 +483,16 @@ export default function MapPage() {
         />
       </BottomSheet>
 
-      {/* Mobile detail bottom sheet */}
-      <BottomSheet
-        open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen && !discoverMobileOpen}
-        onClose={handleCloseDetail}
-        size="half"
-      >
-        <ContactDetail contactId={selectedId} onClose={handleCloseDetail} />
-      </BottomSheet>
+      {/* Mobile detail bottom sheet — hidden on desktop where right sidebar is used */}
+      <div className="sm:hidden">
+        <BottomSheet
+          open={mobileDetailOpen && !!selectedId && !routeBuilderMobileOpen && !discoverMobileOpen}
+          onClose={handleCloseDetail}
+          size="half"
+        >
+          <ContactDetail contactId={selectedId} onClose={handleCloseDetail} />
+        </BottomSheet>
+      </div>
 
       {/* Mobile route builder bottom sheet */}
       <BottomSheet
