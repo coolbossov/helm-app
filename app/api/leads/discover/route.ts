@@ -1,7 +1,8 @@
 // POST /api/leads/discover
-// Calls Google Places Nearby Search API server-side.
-// Returns up to 20 nearby places matching the given type and radius.
+// Calls Google Places Nearby Search (New) API server-side.
+// Returns up to 20 nearby places matching the given keyword and radius.
 // Center is a lat/lng, radius in meters.
+// Uses Places API (New): https://places.googleapis.com/v1/places:searchNearby
 
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -29,23 +30,40 @@ export interface DiscoveryResult {
   already_in_crm: boolean;
 }
 
-interface GooglePlaceResult {
-  place_id: string;
-  name: string;
-  vicinity?: string;
-  geometry?: { location: { lat: number; lng: number } };
+// Places API (New) response types
+interface PlacesNewPlace {
+  id: string;
+  displayName?: { text: string; languageCode?: string };
+  formattedAddress?: string;
+  shortFormattedAddress?: string;
+  location?: { latitude: number; longitude: number };
   rating?: number;
-  user_ratings_total?: number;
-  formatted_phone_number?: string;
-  website?: string;
+  userRatingCount?: number;
+  nationalPhoneNumber?: string;
+  internationalPhoneNumber?: string;
+  websiteUri?: string;
   types?: string[];
+  primaryType?: string;
 }
 
-interface GooglePlacesNearbyResponse {
-  status: string;
-  results?: GooglePlaceResult[];
-  error_message?: string;
+interface PlacesNewResponse {
+  places?: PlacesNewPlace[];
+  error?: { code: number; message: string; status: string };
 }
+
+const FIELD_MASK = [
+  "places.id",
+  "places.displayName",
+  "places.formattedAddress",
+  "places.shortFormattedAddress",
+  "places.location",
+  "places.rating",
+  "places.userRatingCount",
+  "places.nationalPhoneNumber",
+  "places.websiteUri",
+  "places.types",
+  "places.primaryType",
+].join(",");
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -68,48 +86,55 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Google Maps API key not configured" }, { status: 500 });
   }
 
-  // Fetch all pages (up to 60 results via 3 pages of 20)
-  const allResults: GooglePlaceResult[] = [];
-  let pageToken: string | null = null;
+  // Places API (New) Nearby Search — uses Text Search for keyword queries
+  // since Nearby Search (New) doesn't support free-text keyword.
+  // Text Search with locationBias gives the same nearby+keyword behavior.
+  const requestBody = {
+    textQuery: keyword,
+    locationBias: {
+      circle: {
+        center: { latitude: lat, longitude: lng },
+        radius: radius,
+      },
+    },
+    maxResultCount: 20,
+  };
 
-  for (let page = 0; page < 3; page++) {
-    const url = new URL("https://maps.googleapis.com/maps/api/place/nearbysearch/json");
-    url.searchParams.set("location", `${lat},${lng}`);
-    url.searchParams.set("radius", String(radius));
-    url.searchParams.set("keyword", keyword);
-    url.searchParams.set("key", apiKey);
-    if (pageToken) {
-      url.searchParams.set("pagetoken", pageToken);
-      // Google requires a short delay before using a page token
-      await new Promise((r) => setTimeout(r, 2000));
-    }
+  const res = await fetch("https://places.googleapis.com/v1/places:searchText", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Goog-Api-Key": apiKey,
+      "X-Goog-FieldMask": FIELD_MASK,
+    },
+    body: JSON.stringify(requestBody),
+  });
 
-    const res = await fetch(url.toString());
-    if (!res.ok) break;
-
-    const json = (await res.json()) as GooglePlacesNearbyResponse;
-    if (json.status !== "OK" && json.status !== "ZERO_RESULTS") {
-      return NextResponse.json(
-        { error: json.error_message || `Places API error: ${json.status}` },
-        { status: 502 }
-      );
-    }
-
-    if (json.results) allResults.push(...json.results);
-
-    // Stop if there are no more pages
-    if (!("next_page_token" in json) || !json.next_page_token) break;
-    pageToken = json.next_page_token as string;
+  if (!res.ok) {
+    const errorBody = await res.text();
+    return NextResponse.json(
+      { error: `Places API error: ${res.status} ${errorBody}` },
+      { status: 502 }
+    );
   }
+
+  const json = (await res.json()) as PlacesNewResponse;
+
+  if (json.error) {
+    return NextResponse.json(
+      { error: json.error.message || `Places API error: ${json.error.status}` },
+      { status: 502 }
+    );
+  }
+
+  const allResults = json.places ?? [];
 
   if (allResults.length === 0) {
     return NextResponse.json({ data: [] });
   }
 
   // Check which place_ids are already in CRM
-  const placeIds = allResults
-    .map((p) => p.place_id)
-    .filter(Boolean);
+  const placeIds = allResults.map((p) => p.id).filter(Boolean);
 
   const { data: existing } = await supabase
     .from("synced_contacts")
@@ -119,19 +144,19 @@ export async function POST(request: NextRequest) {
   const existingIds = new Set((existing ?? []).map((r) => r.place_id).filter(Boolean));
 
   const results: DiscoveryResult[] = allResults
-    .filter((p) => p.geometry?.location)
+    .filter((p) => p.location)
     .map((p) => ({
-      place_id: p.place_id,
-      name: p.name,
-      address: p.vicinity || "",
-      lat: p.geometry!.location.lat,
-      lng: p.geometry!.location.lng,
+      place_id: p.id,
+      name: p.displayName?.text ?? "Unknown",
+      address: p.shortFormattedAddress ?? p.formattedAddress ?? "",
+      lat: p.location!.latitude,
+      lng: p.location!.longitude,
       rating: p.rating ?? null,
-      user_ratings_total: p.user_ratings_total ?? null,
-      phone: p.formatted_phone_number ?? null,
-      website: p.website ?? null,
-      types: p.types ?? [],
-      already_in_crm: existingIds.has(p.place_id),
+      user_ratings_total: p.userRatingCount ?? null,
+      phone: p.nationalPhoneNumber ?? null,
+      website: p.websiteUri ?? null,
+      types: p.types ?? (p.primaryType ? [p.primaryType] : []),
+      already_in_crm: existingIds.has(p.id),
     }));
 
   return NextResponse.json({ data: results, count: results.length });
