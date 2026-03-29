@@ -3,7 +3,12 @@
 import { useRef, useEffect } from "react";
 import { MarkerClusterer, SuperClusterAlgorithm } from "@googlemaps/markerclusterer";
 import { useMap } from "@/lib/hooks/use-map";
-import { BUSINESS_TYPE_COLORS, VISIT_STATUS_COLORS, getVisitRecencyColor, CLUSTER_MAX_ZOOM } from "@/types";
+import {
+  BUSINESS_TYPE_COLORS,
+  VISIT_STATUS_COLORS,
+  getVisitRecencyColor,
+  CLUSTER_MAX_ZOOM,
+} from "@/types";
 import type { ContactMarkerData } from "@/types";
 import type { MapSettings } from "@/lib/hooks/use-map-settings";
 import { Spinner } from "@/components/ui";
@@ -30,9 +35,7 @@ interface GoogleMapViewProps {
   autoPlanPins?: AutoPlanPins;
   placeMarkers?: PlaceMarker[];
   onPlaceClick?: (place: PlaceMarker) => void;
-  /** IDs of contacts added to the route builder — rendered with a numbered overlay */
   routeStopIds?: string[];
-  /** Fires on map idle with the current center — used by Discover panel */
   onCenterChange?: (center: { lat: number; lng: number }) => void;
 }
 
@@ -55,62 +58,25 @@ function getMarkerSize(contact: ContactMarkerData): number {
   return 9;
 }
 
-// Option B: SVG teardrop pin
-function createPinSVG(color: string, size: number): string {
-  const w = size * 2;
-  const h = size * 2.6;
-  // abbreviation not needed — color already encodes type
-  return `
-    <svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-      <path
-        d="M${w / 2},${h - 2}
-           C${w / 2},${h - 2} 2,${h * 0.55}
-           2,${w / 2}
-           a${w / 2 - 2},${w / 2 - 2} 0 1,1 ${w - 4},0
-           C${w - 2},${h * 0.55} ${w / 2},${h - 2} Z"
-        fill="${color}"
-        stroke="white"
-        stroke-width="2"
-      />
-      <circle cx="${w / 2}" cy="${w / 2}" r="${size * 0.35}" fill="white" opacity="0.7" />
-    </svg>
-  `;
-}
-
-function createCircleMarker(
+function buildContactIcon(
   contact: ContactMarkerData,
-  settings: MapSettings
-): HTMLDivElement {
-  const color = getMarkerColor(contact, settings.visitColorMode);
-  const size = getMarkerSize(contact);
+  settings: MapSettings,
+  selected: boolean
+): google.maps.Symbol {
+  const fillColor = getMarkerColor(contact, settings.visitColorMode);
+  const baseScale = getMarkerSize(contact);
+  const scale = selected ? baseScale * 1.45 : baseScale;
+  const strokeColor = settings.coverageOverlay ? getCoverageRing(contact) : "#ffffff";
+  const strokeWeight = settings.coverageOverlay ? 4 : settings.outlinedMarkers ? 3 : 2;
 
-  const pin = document.createElement("div");
-  pin.style.width = `${size * 2}px`;
-  pin.style.height = `${size * 2}px`;
-  pin.style.borderRadius = "50%";
-  pin.style.backgroundColor = color;
-  pin.style.border = "2px solid white";
-  pin.style.cursor = "pointer";
-  pin.style.transition = "transform 0.15s ease";
-
-  if (settings.outlinedMarkers) {
-    pin.style.boxShadow = "0 0 0 2px rgba(0,0,0,0.5), 0 2px 4px rgba(0,0,0,0.3)";
-  } else {
-    pin.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
-  }
-
-  return pin;
-}
-
-function createPinMarker(contact: ContactMarkerData, visitColorMode: boolean): HTMLDivElement {
-  const color = getMarkerColor(contact, visitColorMode);
-  const size = getMarkerSize(contact);
-
-  const wrapper = document.createElement("div");
-  wrapper.style.cursor = "pointer";
-  wrapper.style.transition = "transform 0.15s ease";
-  wrapper.innerHTML = createPinSVG(color, size);
-  return wrapper;
+  return {
+    path: google.maps.SymbolPath.CIRCLE,
+    fillColor,
+    fillOpacity: 1,
+    strokeColor,
+    strokeWeight,
+    scale,
+  };
 }
 
 export function GoogleMapView({
@@ -127,82 +93,37 @@ export function GoogleMapView({
 }: GoogleMapViewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { map, ready, error } = useMap(containerRef);
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const clustererRef = useRef<MarkerClusterer | null>(null);
-  const pinElementsRef = useRef<Map<string, HTMLDivElement>>(new Map());
-  const selectedIdRef = useRef<string | null>(null);
-  const autoPlanMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const placeMarkersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
-  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
-  // Track zoom for Option A scaling
-  const zoomListenerRef = useRef<google.maps.MapsEventListener | null>(null);
-  // Route stop number overlay markers
-  const routeOverlaysRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
-  // Build markers when map, contacts, settings, or coverageMap change
+  const markersRef = useRef<google.maps.Marker[]>([]);
+  const markerByIdRef = useRef<Map<string, google.maps.Marker>>(new Map());
+  const clustererRef = useRef<MarkerClusterer | null>(null);
+  const selectedIdRef = useRef<string | null>(null);
+
+  const autoPlanMarkersRef = useRef<google.maps.Marker[]>([]);
+  const placeMarkersRef = useRef<google.maps.Marker[]>([]);
+  const routeOverlaysRef = useRef<google.maps.Marker[]>([]);
+  const mapClickListenerRef = useRef<google.maps.MapsEventListener | null>(null);
+
   useEffect(() => {
     if (!map || !ready) return;
 
-    markersRef.current.forEach((m) => (m.map = null));
+    markersRef.current.forEach((m) => m.setMap(null));
     markersRef.current = [];
-    pinElementsRef.current.clear();
-    if (clustererRef.current) {
-      clustererRef.current.clearMarkers();
-    }
-    if (zoomListenerRef.current) {
-      zoomListenerRef.current.remove();
-      zoomListenerRef.current = null;
-    }
+    markerByIdRef.current.clear();
+    if (clustererRef.current) clustererRef.current.clearMarkers();
 
     const newMarkers = contacts.map((contact) => {
-      const pin = settings.pinMarkers
-        ? createPinMarker(contact, settings.visitColorMode)
-        : createCircleMarker(contact, settings);
-
-      // Apply coverage ring overlay
-      if (settings.coverageOverlay && !settings.pinMarkers) {
-        const ringColor = getCoverageRing(contact);
-        pin.style.boxShadow = `0 0 0 3px ${ringColor}, 0 2px 4px rgba(0,0,0,0.3)`;
-      }
-
-      pinElementsRef.current.set(contact.id, pin);
-
-      const marker = new google.maps.marker.AdvancedMarkerElement({
+      const marker = new google.maps.Marker({
         position: { lat: contact.latitude, lng: contact.longitude },
-        content: pin,
         title: contact.account_name || contact.last_name,
+        icon: buildContactIcon(contact, settings, contact.id === selectedIdRef.current),
       });
-
       marker.addListener("click", () => onMarkerClick(contact));
+      markerByIdRef.current.set(contact.id, marker);
       return marker;
     });
 
     markersRef.current = newMarkers;
-
-    // Reapply selection state
-    if (selectedIdRef.current) {
-      const pin = pinElementsRef.current.get(selectedIdRef.current);
-      if (pin) {
-        pin.style.transform = "scale(1.4)";
-        pin.style.zIndex = "10";
-      }
-    }
-
-    // Option A: scale all markers at zoom ≥ 15
-    if (settings.outlinedMarkers && !settings.pinMarkers) {
-      const applyZoomScale = () => {
-        const zoom = map.getZoom() ?? 0;
-        const scale = zoom >= 15 ? "scale(1.5)" : "";
-        pinElementsRef.current.forEach((pin, id) => {
-          // Don't override selected marker's transform
-          if (id !== selectedIdRef.current) {
-            pin.style.transform = scale;
-          }
-        });
-      };
-      applyZoomScale();
-      zoomListenerRef.current = map.addListener("zoom_changed", applyZoomScale);
-    }
 
     clustererRef.current = new MarkerClusterer({
       map,
@@ -214,67 +135,58 @@ export function GoogleMapView({
       renderer: {
         render({ count, position }) {
           const size = Math.min(24 + Math.log2(count) * 8, 56);
-          const el = document.createElement("div");
-          el.style.width = `${size}px`;
-          el.style.height = `${size}px`;
-          el.style.borderRadius = "50%";
-          el.style.backgroundColor = "#2563eb";
-          el.style.border = "3px solid white";
-          el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.3)";
-          el.style.display = "flex";
-          el.style.alignItems = "center";
-          el.style.justifyContent = "center";
-          el.style.color = "white";
-          el.style.fontSize = `${Math.max(11, 14 - Math.floor(count / 100))}px`;
-          el.style.fontWeight = "700";
-          el.style.cursor = "pointer";
-          el.textContent = count > 999 ? `${(count / 1000).toFixed(1)}k` : String(count);
-
-          return new google.maps.marker.AdvancedMarkerElement({
+          return new google.maps.Marker({
             position,
-            content: el,
+            icon: {
+              path: google.maps.SymbolPath.CIRCLE,
+              fillColor: "#2563eb",
+              fillOpacity: 0.95,
+              strokeColor: "#ffffff",
+              strokeWeight: 3,
+              scale: size / 2,
+            },
+            label: {
+              text: count > 999 ? `${(count / 1000).toFixed(1)}k` : String(count),
+              color: "#ffffff",
+              fontWeight: "700",
+              fontSize: "12px",
+            },
+            zIndex: 999,
           });
         },
       },
     });
 
     return () => {
-      markersRef.current.forEach((m) => (m.map = null));
-      pinElementsRef.current.clear();
-      if (clustererRef.current) {
-        clustererRef.current.clearMarkers();
-      }
-      if (zoomListenerRef.current) {
-        zoomListenerRef.current.remove();
-        zoomListenerRef.current = null;
-      }
+      markersRef.current.forEach((m) => m.setMap(null));
+      markerByIdRef.current.clear();
+      if (clustererRef.current) clustererRef.current.clearMarkers();
     };
   }, [map, ready, contacts, onMarkerClick, settings]);
 
-  // Update only the affected pins when selection changes
   useEffect(() => {
     const prevId = selectedIdRef.current;
-
     if (prevId) {
-      const prev = pinElementsRef.current.get(prevId);
-      if (prev) {
-        prev.style.transform = "";
-        prev.style.zIndex = "";
+      const prevContact = contacts.find((c) => c.id === prevId);
+      const prevMarker = markerByIdRef.current.get(prevId);
+      if (prevContact && prevMarker) {
+        prevMarker.setIcon(buildContactIcon(prevContact, settings, false));
+        prevMarker.setZIndex(undefined);
       }
     }
 
     if (selectedId) {
-      const next = pinElementsRef.current.get(selectedId);
-      if (next) {
-        next.style.transform = "scale(1.4)";
-        next.style.zIndex = "10";
+      const nextContact = contacts.find((c) => c.id === selectedId);
+      const nextMarker = markerByIdRef.current.get(selectedId);
+      if (nextContact && nextMarker) {
+        nextMarker.setIcon(buildContactIcon(nextContact, settings, true));
+        nextMarker.setZIndex(1000);
       }
     }
 
     selectedIdRef.current = selectedId;
-  }, [selectedId]);
+  }, [selectedId, contacts, settings]);
 
-  // Map click handler for auto-plan mode
   useEffect(() => {
     if (!map || !ready) return;
     if (mapClickListenerRef.current) {
@@ -282,12 +194,9 @@ export function GoogleMapView({
       mapClickListenerRef.current = null;
     }
     if (onMapClick) {
-      mapClickListenerRef.current = map.addListener(
-        "click",
-        (e: google.maps.MapMouseEvent) => {
-          if (e.latLng) onMapClick(e.latLng.lat(), e.latLng.lng());
-        }
-      );
+      mapClickListenerRef.current = map.addListener("click", (e: google.maps.MapMouseEvent) => {
+        if (e.latLng) onMapClick(e.latLng.lat(), e.latLng.lng());
+      });
     }
     return () => {
       if (mapClickListenerRef.current) {
@@ -297,7 +206,6 @@ export function GoogleMapView({
     };
   }, [map, ready, onMapClick]);
 
-  // Fire map center to parent on map idle (for Discover panel)
   useEffect(() => {
     if (!map || !ready || !onCenterChange) return;
     const listener = map.addListener("idle", () => {
@@ -307,138 +215,129 @@ export function GoogleMapView({
     return () => listener.remove();
   }, [map, ready, onCenterChange]);
 
-  // Auto-plan start/end pins
   useEffect(() => {
     if (!map || !ready) return;
-    autoPlanMarkersRef.current.forEach((m) => (m.map = null));
+    autoPlanMarkersRef.current.forEach((m) => m.setMap(null));
     autoPlanMarkersRef.current = [];
-
     if (!autoPlanPins) return;
 
-    const makePin = (color: string, label: string) => {
-      const el = document.createElement("div");
-      el.style.width = "24px";
-      el.style.height = "24px";
-      el.style.borderRadius = "50%";
-      el.style.backgroundColor = color;
-      el.style.border = "3px solid white";
-      el.style.boxShadow = "0 2px 8px rgba(0,0,0,0.4)";
-      el.style.display = "flex";
-      el.style.alignItems = "center";
-      el.style.justifyContent = "center";
-      el.style.fontSize = "10px";
-      el.style.fontWeight = "800";
-      el.style.color = "white";
-      el.textContent = label;
-      return el;
-    };
-
     if (autoPlanPins.start) {
-      const m = new google.maps.marker.AdvancedMarkerElement({
-        position: autoPlanPins.start,
-        content: makePin("#16a34a", "S"),
-        title: "Start",
-        map,
-      });
-      autoPlanMarkersRef.current.push(m);
+      autoPlanMarkersRef.current.push(
+        new google.maps.Marker({
+          position: autoPlanPins.start,
+          map,
+          title: "Start",
+          label: { text: "S", color: "#ffffff", fontWeight: "700" },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#16a34a",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+            scale: 10,
+          },
+          zIndex: 1001,
+        })
+      );
     }
+
     if (autoPlanPins.end) {
-      const m = new google.maps.marker.AdvancedMarkerElement({
-        position: autoPlanPins.end,
-        content: makePin("#dc2626", "E"),
-        title: "End",
-        map,
-      });
-      autoPlanMarkersRef.current.push(m);
+      autoPlanMarkersRef.current.push(
+        new google.maps.Marker({
+          position: autoPlanPins.end,
+          map,
+          title: "End",
+          label: { text: "E", color: "#ffffff", fontWeight: "700" },
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#dc2626",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+            scale: 10,
+          },
+          zIndex: 1001,
+        })
+      );
     }
 
     return () => {
-      autoPlanMarkersRef.current.forEach((m) => (m.map = null));
+      autoPlanMarkersRef.current.forEach((m) => m.setMap(null));
       autoPlanMarkersRef.current = [];
     };
   }, [map, ready, autoPlanPins]);
 
-  // Route stop number overlays — small numbered badges on selected stops
   useEffect(() => {
     if (!map || !ready) return;
-    routeOverlaysRef.current.forEach((m) => (m.map = null));
+    routeOverlaysRef.current.forEach((m) => m.setMap(null));
     routeOverlaysRef.current = [];
 
     if (routeStopIds.length === 0) return;
 
-    const newOverlays = routeStopIds.map((id, index) => {
-      const contact = contacts.find((c) => c.id === id);
-      if (!contact) return null;
-
-      const el = document.createElement("div");
-      el.style.width = "18px";
-      el.style.height = "18px";
-      el.style.borderRadius = "50%";
-      el.style.backgroundColor = "#1d4ed8";
-      el.style.border = "2px solid white";
-      el.style.boxShadow = "0 2px 6px rgba(0,0,0,0.4)";
-      el.style.display = "flex";
-      el.style.alignItems = "center";
-      el.style.justifyContent = "center";
-      el.style.fontSize = "9px";
-      el.style.fontWeight = "800";
-      el.style.color = "white";
-      el.style.pointerEvents = "none";
-      el.style.transform = "translate(8px, -8px)";
-      el.textContent = String(index + 1);
-
-      return new google.maps.marker.AdvancedMarkerElement({
-        position: { lat: contact.latitude, lng: contact.longitude },
-        content: el,
-        zIndex: 20,
-        map,
-      });
-    }).filter((m): m is google.maps.marker.AdvancedMarkerElement => m !== null);
-
-    routeOverlaysRef.current = newOverlays;
+    routeOverlaysRef.current = routeStopIds
+      .map((id, index) => {
+        const contact = contacts.find((c) => c.id === id);
+        if (!contact) return null;
+        return new google.maps.Marker({
+          position: { lat: contact.latitude, lng: contact.longitude },
+          map,
+          clickable: false,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            fillColor: "#1d4ed8",
+            fillOpacity: 1,
+            strokeColor: "#ffffff",
+            strokeWeight: 2,
+            scale: 9,
+          },
+          label: {
+            text: String(index + 1),
+            color: "#ffffff",
+            fontWeight: "700",
+            fontSize: "10px",
+          },
+          zIndex: 1002,
+        });
+      })
+      .filter((m): m is google.maps.Marker => m !== null);
 
     return () => {
-      routeOverlaysRef.current.forEach((m) => (m.map = null));
+      routeOverlaysRef.current.forEach((m) => m.setMap(null));
       routeOverlaysRef.current = [];
     };
   }, [map, ready, routeStopIds, contacts]);
 
-  // Place search markers (orange diamonds)
   useEffect(() => {
     if (!map || !ready) return;
-    placeMarkersRef.current.forEach((m) => (m.map = null));
+    placeMarkersRef.current.forEach((m) => m.setMap(null));
     placeMarkersRef.current = [];
 
     if (!placeMarkers || placeMarkers.length === 0) return;
 
-    const newMarkers = placeMarkers.map((place) => {
-      const el = document.createElement("div");
-      el.style.width = "14px";
-      el.style.height = "14px";
-      el.style.backgroundColor = "#f97316";
-      el.style.border = "2px solid white";
-      el.style.boxShadow = "0 2px 4px rgba(0,0,0,0.3)";
-      el.style.transform = "rotate(45deg)";
-      el.style.cursor = "pointer";
-
-      const marker = new google.maps.marker.AdvancedMarkerElement({
+    placeMarkersRef.current = placeMarkers.map((place) => {
+      const marker = new google.maps.Marker({
         position: { lat: place.lat, lng: place.lng },
-        content: el,
-        title: place.name,
         map,
+        title: place.name,
+        icon: {
+          path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+          fillColor: "#f97316",
+          fillOpacity: 1,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
+          scale: 5,
+          rotation: 45,
+        },
+        zIndex: 1000,
       });
-
       if (onPlaceClick) {
         marker.addListener("click", () => onPlaceClick(place));
       }
-
       return marker;
     });
 
-    placeMarkersRef.current = newMarkers;
-
     return () => {
-      placeMarkersRef.current.forEach((m) => (m.map = null));
+      placeMarkersRef.current.forEach((m) => m.setMap(null));
       placeMarkersRef.current = [];
     };
   }, [map, ready, placeMarkers, onPlaceClick]);
