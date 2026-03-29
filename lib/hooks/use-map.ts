@@ -21,6 +21,7 @@ export function useMap(containerRef: React.RefObject<HTMLDivElement | null>) {
         const map = new google.maps.Map(containerRef.current, {
           center: SA_CENTER,
           zoom: DEFAULT_ZOOM,
+          mapId: process.env.NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID || "",
           disableDefaultUI: false,
           zoomControl: true,
           mapTypeControl: false,
