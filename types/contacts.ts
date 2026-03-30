@@ -1,9 +1,30 @@
 export type BusinessType =
-  | "Dance"
   | "School"
+  | "School - Public 6-8"
+  | "School - Public 6-12"
+  | "School - Public 9-12"
+  | "School - Charter Elementary"
+  | "School - Charter 6-12"
+  | "School - Charter K-12"
+  | "School - Private Elementary"
+  | "School - Private 6-12"
+  | "School - Private K-12"
+  | "Dance"
+  | "Gymnastics"
   | "Daycare"
   | "Cheer"
   | "Sports"
+  | "Martial Arts"
+  | "Performing Arts"
+  | "Senior Living"
+  | "Family Photoshoot"
+  | "Mini Sessions"
+  | "Headshots"
+  | "Event"
+  | "Photo Booth"
+  | "Media Day"
+  | "Product"
+  | "Military"
   | "Other";
 
 export type Priority =
@@ -114,12 +135,37 @@ export const DEFAULT_FILTERS: ContactFilters = {
 };
 
 export const BUSINESS_TYPE_COLORS: Record<string, string> = {
-  Dance: "#ec4899",
-  School: "#3b82f6",
-  Daycare: "#22c55e",
-  Cheer: "#a855f7",
-  Sports: "#f97316",
-  Other: "#6b7280",
+  // Schools — blue family
+  "School":                      "#3b82f6",
+  "School - Public 6-8":         "#2563eb",
+  "School - Public 6-12":        "#1d4ed8",
+  "School - Public 9-12":        "#1e40af",
+  "School - Charter Elementary": "#0284c7",
+  "School - Charter 6-12":       "#0369a1",
+  "School - Charter K-12":       "#075985",
+  "School - Private Elementary": "#7c3aed",
+  "School - Private 6-12":       "#6d28d9",
+  "School - Private K-12":       "#5b21b6",
+  // Activity-based
+  "Dance":           "#ec4899",
+  "Gymnastics":      "#f59e0b",
+  "Daycare":         "#22c55e",
+  "Cheer":           "#a855f7",
+  "Sports":          "#f97316",
+  "Martial Arts":    "#ef4444",
+  "Performing Arts": "#d946ef",
+  "Senior Living":   "#14b8a6",
+  // Photography sessions
+  "Family Photoshoot": "#f472b6",
+  "Mini Sessions":     "#fb923c",
+  "Headshots":         "#64748b",
+  "Event":             "#8b5cf6",
+  "Photo Booth":       "#06b6d4",
+  "Media Day":         "#10b981",
+  "Product":           "#6366f1",
+  // Other
+  "Military": "#78716c",
+  "Other":    "#6b7280",
 };
 
 /** Pin fill color by visit status (used when map is in "visit mode") */

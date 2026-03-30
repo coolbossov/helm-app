@@ -267,6 +267,7 @@ export default function MapPage() {
       lng: r.lng,
       selected: selectedSearchIds.has(r.place_id),
       inCrm: r.already_in_crm,
+      contact_id: r.contact_id ?? null,
     })),
     [searchResults, selectedSearchIds]
   );
@@ -490,13 +491,22 @@ export default function MapPage() {
           onSearchPinClick={(placeId) => {
             if (!(findLeadsOpen || findLeadsMobileOpen)) return;
             const target = searchResults.find((result) => result.place_id === placeId);
-            if (!target || target.already_in_crm) return;
-            setSelectedSearchIds((prev) => {
-              const next = new Set(prev);
-              if (next.has(placeId)) next.delete(placeId);
-              else next.add(placeId);
-              return next;
-            });
+            if (!target) return;
+            // Teal pin (already in CRM) → open existing contact detail
+            if (target.already_in_crm && target.contact_id) {
+              setSelectedId(target.contact_id);
+              setMobileDetailOpen(true);
+              return;
+            }
+            // Pink pin (new lead) → toggle selection
+            if (!target.already_in_crm) {
+              setSelectedSearchIds((prev) => {
+                const next = new Set(prev);
+                if (next.has(placeId)) next.delete(placeId);
+                else next.add(placeId);
+                return next;
+              });
+            }
           }}
           showSearchAreaButton={(findLeadsOpen || findLeadsMobileOpen) && hasSearchedFindLeads && findLeadsMapMoved}
           onSearchAreaRequest={() => setSearchAreaRequestId((prev) => prev + 1)}
