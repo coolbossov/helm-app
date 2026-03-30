@@ -70,6 +70,7 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Visit activity meta: all non-resolved resolution reasons (`no_company_name`, `not_found`, `ambiguous`, etc.) must be surfaced in the response — never silently swallow non-success cases. Always handle ALL resolution outcomes uniformly in activity logging routes.
 - Bigin v2 API: `fields` param must be passed as a comma-separated string in the query string, not as a JSON body param. Incorrect param format causes the API to return all fields (performance hit) or a 400 silently.
 - Zoho sync counters (`created`, `updated`, `unchanged`) must be declared as `let` (mutable) — `const` counters that are never incremented produce permanently-zero counts in sync result logs.
+- GitHub squash-merge state lag: when the CI `auto-merge` job shows SUCCESS but a PR still shows OPEN, do NOT re-merge. Verify via `git fetch origin && git show origin/main:path/to/file | grep expected_change`. If the change is present, the merge succeeded — GitHub UI is lagging. Close the PR manually with a note. Only attempt manual merge if the change is confirmed absent from `origin/main`.
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
