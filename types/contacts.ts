@@ -1,5 +1,6 @@
 export type BusinessType =
   | "School"
+  | "School - Public Elementary"
   | "School - Public 6-8"
   | "School - Public 6-12"
   | "School - Public 9-12"
@@ -167,6 +168,7 @@ export const DEFAULT_FILTERS: ContactFilters = {
 export const BUSINESS_TYPE_COLORS: Record<string, string> = {
   // Schools — blue family
   "School":                      "#3b82f6",
+  "School - Public Elementary":  "#3b82f6",
   "School - Public 6-8":         "#2563eb",
   "School - Public 6-12":        "#1d4ed8",
   "School - Public 9-12":        "#1e40af",
