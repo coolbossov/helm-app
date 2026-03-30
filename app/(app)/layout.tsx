@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { Header } from "@/components/layout/header";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { OfflineIndicator } from "@/components/ui";
@@ -37,9 +37,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     // h-[100dvh] accounts for iOS Safari dynamic viewport (address bar collapse)
     <div className="flex h-[100dvh] flex-col">
       <OfflineIndicator />
-      <Header />
+      <Suspense fallback={null}>
+        <Header />
+      </Suspense>
       <main className="flex-1 overflow-hidden">{children}</main>
-      <MobileNav />
+      <Suspense fallback={null}>
+        <MobileNav />
+      </Suspense>
     </div>
   );
 }

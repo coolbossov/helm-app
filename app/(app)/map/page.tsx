@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useCallback, useMemo, useRef } from "react";
+import { useState, useCallback, useMemo, useRef, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Filter, Route, Telescope } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
 import { SearchBar } from "@/components/map/search-bar";
@@ -40,8 +40,9 @@ interface LatLng {
   lng: number;
 }
 
-export default function MapPage() {
+function MapPageInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const isMobile = useIsMobile();
   const { markers, loading, error, truncated, refetch } = useContacts();
   const { filters, filtered, updateFilter, resetFilters, activeFilterCount } =
@@ -204,6 +205,18 @@ export default function MapPage() {
     setRouteBuilderOpen(false);
     setRouteBuilderMobileOpen(false);
   };
+
+  // React to ?mode=leads or ?mode=builder on load and on URL changes
+  const urlMode = searchParams.get("mode");
+  useEffect(() => {
+    if (urlMode === "leads") {
+      openFindLeads();
+    } else if (urlMode === "builder") {
+      openRouteBuilder();
+    }
+    // openFindLeads / openRouteBuilder are stable w.r.t. isMobile; re-run only when urlMode changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [urlMode]);
 
   const handleRouteReorder = useCallback((from: number, to: number) => {
     setRouteStops((prev) => {
@@ -605,5 +618,13 @@ export default function MapPage() {
         {findLeadsPanel}
       </BottomSheet>
     </div>
+  );
+}
+
+export default function MapPage() {
+  return (
+    <Suspense fallback={null}>
+      <MapPageInner />
+    </Suspense>
   );
 }
