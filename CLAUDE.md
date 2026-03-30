@@ -67,6 +67,9 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - `supabase db push --linked --yes` flag required for non-interactive shells (CI, scripts) — omitting `--yes` causes push to hang waiting for confirmation.
 - Migrations 012 and 013 were applied directly to production outside of `db push` — sentinel rows inserted manually to restore tracking table alignment. Current production state: migrations 001–017 all applied and tracked.
 - Ambiguous company→contact resolution in visit activity logging: when a route stop has `company_id` but no `contact_id`, the API resolves the linked contact via `synced_companies.account_name` match against `synced_contacts.account_name`. If 0 or 2+ contacts match, the activity is logged with `contact_id: null` (safe fallback) rather than throwing. Never assume a company stop has a resolvable contact — always handle the null case in activity logging routes.
+- Visit activity meta: all non-resolved resolution reasons (`no_company_name`, `not_found`, `ambiguous`, etc.) must be surfaced in the response — never silently swallow non-success cases. Always handle ALL resolution outcomes uniformly in activity logging routes.
+- Bigin v2 API: `fields` param must be passed as a comma-separated string in the query string, not as a JSON body param. Incorrect param format causes the API to return all fields (performance hit) or a 400 silently.
+- Zoho sync counters (`created`, `updated`, `unchanged`) must be declared as `let` (mutable) — `const` counters that are never incremented produce permanently-zero counts in sync result logs.
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
