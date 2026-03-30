@@ -65,7 +65,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   }
 
   const stops = route.route_stops ?? [];
-  const companyCount = stops.filter((s) => s.synced_companies || s.synced_contacts).length;
+  const companyCount = stops.filter((s) => s.synced_companies?.id != null || s.synced_contacts?.id != null).length;
   const visitedCount = stops.filter((s) => s.status === "visited").length;
   const skippedCount = stops.filter((s) => s.status === "skipped").length;
   const allDone = stops.length > 0 && visitedCount + skippedCount === stops.length;
@@ -201,8 +201,8 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
             const lng = company?.longitude ?? contact?.longitude;
             const encodedAddr = address ? encodeURIComponent(address) : "";
             const googleUrl = address ? `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}` : null;
-            const appleUrl = lat && lng ? `maps://maps.apple.com/?daddr=${lat},${lng}` : null;
-            const wazeUrl = lat && lng ? `https://waze.com/ul?ll=${lat},${lng}&navigate=yes` : null;
+            const appleUrl = lat != null && lng != null ? `maps://maps.apple.com/?daddr=${lat},${lng}` : null;
+            const wazeUrl = lat != null && lng != null ? `https://waze.com/ul?ll=${lat},${lng}&navigate=yes` : null;
 
             const isExpanded = expandedStop === stop.id;
 
