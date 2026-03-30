@@ -11,7 +11,7 @@ import { MapSettingsButton } from "@/components/map/map-settings";
 import { CoverageLegend } from "@/components/map/coverage-legend";
 import { VisitStatusLegend } from "@/components/map/visit-status-legend";
 import { BottomSheet, Spinner } from "@/components/ui";
-import { useContacts, useFilters } from "@/lib/hooks";
+import { useContacts, useFilters, useIsMobile } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
 import { contactsInCorridor } from "@/lib/utils/geo";
 import type { ContactMarkerData } from "@/types";
@@ -42,7 +42,8 @@ interface LatLng {
 
 export default function MapPage() {
   const router = useRouter();
-  const { markers, loading, error, refetch } = useContacts();
+  const isMobile = useIsMobile();
+  const { markers, loading, error, truncated, refetch } = useContacts();
   const { filters, filtered, updateFilter, resetFilters, activeFilterCount } =
     useFilters(markers);
   const { settings, updateSetting } = useMapSettings();
@@ -170,7 +171,7 @@ export default function MapPage() {
   const openFindLeads = () => {
     // Mutual exclusion: close route builder if open
     closeRouteBuilder();
-    if (window.innerWidth < 640) {
+    if (isMobile) {
       setFindLeadsMobileOpen(true);
     } else {
       setFindLeadsOpen(true);
@@ -191,7 +192,7 @@ export default function MapPage() {
   const openRouteBuilder = () => {
     // Mutual exclusion: close find leads if open
     closeFindLeads();
-    if (window.innerWidth < 640) {
+    if (isMobile) {
       setRouteBuilderMobileOpen(true);
     } else {
       setRouteBuilderOpen(true);
@@ -284,6 +285,14 @@ export default function MapPage() {
     [autoPlanActive, handleMapClickWrapper]
   );
 
+  const handleResultsChange = useCallback((results: DiscoveryResult[]) => {
+    setSearchResults(results);
+    setSelectedSearchIds(new Set());
+    setHasSearchedFindLeads(true);
+  }, []);
+
+  const handleSearchCompleted = useCallback(() => setFindLeadsMapMoved(false), []);
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -330,13 +339,9 @@ export default function MapPage() {
       searchAreaRequestId={searchAreaRequestId}
       onClose={closeFindLeads}
       onLeadsAdded={refetch}
-      onResultsChange={(results) => {
-        setSearchResults(results);
-        setSelectedSearchIds(new Set());
-        setHasSearchedFindLeads(true);
-      }}
+      onResultsChange={handleResultsChange}
       onSelectedIdsChange={setSelectedSearchIds}
-      onSearchCompleted={() => setFindLeadsMapMoved(false)}
+      onSearchCompleted={handleSearchCompleted}
     />
   );
 
@@ -362,7 +367,7 @@ export default function MapPage() {
           {/* Filter toggle */}
           <button
             onClick={() => {
-              if (window.innerWidth < 640) {
+              if (isMobile) {
                 setMobileFilterOpen(true);
               } else {
                 setFilterOpen((v) => !v);
@@ -460,10 +465,15 @@ export default function MapPage() {
         )}
 
         {/* Stats badge */}
-        <div className="absolute bottom-20 left-3 z-10 sm:bottom-4 sm:left-4">
+        <div className="absolute bottom-20 left-3 z-10 sm:bottom-4 sm:left-4 space-y-1">
           <div className="rounded-lg bg-white/90 px-3 py-1.5 shadow-sm backdrop-blur-sm">
             <MapStats total={markers.length} visible={filtered.length} />
           </div>
+          {truncated && (
+            <div className="rounded-lg bg-orange-100 px-3 py-1.5 shadow-sm text-xs text-orange-700 font-medium">
+              Showing first 10,000 — sync to load all
+            </div>
+          )}
         </div>
 
         {/* Legend: visit status or coverage overlay */}

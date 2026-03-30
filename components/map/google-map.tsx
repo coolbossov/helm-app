@@ -193,7 +193,7 @@ export const GoogleMapView = memo(function GoogleMapView({
 
     markersRef.current = newMarkers;
 
-    clustererRef.current = new MarkerClusterer({
+    const clusterer = new MarkerClusterer({
       map,
       markers: newMarkers,
       algorithm: new SuperClusterAlgorithm({
@@ -202,12 +202,15 @@ export const GoogleMapView = memo(function GoogleMapView({
       }),
       renderer: clusterRenderer,
     });
+    clustererRef.current = clusterer;
 
+    // Capture stable references for cleanup (avoids react-hooks/exhaustive-deps ref warning)
+    const markers = newMarkers;
     const markerById = markerByIdRef.current;
     return () => {
-      markersRef.current.forEach((m) => m.setMap(null));
+      markers.forEach((m) => m.setMap(null));
       markerById.clear();
-      if (clustererRef.current) clustererRef.current.clearMarkers();
+      clusterer.clearMarkers();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- contacts only; settings handled by style-update effect
   }, [map, ready, contacts]);

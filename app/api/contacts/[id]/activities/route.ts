@@ -7,7 +7,11 @@ const createSchema = z.object({
   activity_type: z.enum(["visit", "call", "note", "status_change", "field_change"]),
   title: z.string().max(500).optional(),
   content: z.string().max(5000).optional(),
-  metadata: z.record(z.unknown()).optional(),
+  // Cap metadata at 50 keys and 1KB serialized to prevent storage abuse
+  metadata: z.record(z.unknown()).optional().refine(
+    (m) => !m || (Object.keys(m).length <= 50 && JSON.stringify(m).length <= 1024),
+    { message: "metadata too large (max 50 keys, 1KB)" }
+  ),
 });
 
 type Params = { params: Promise<{ id: string }> };
@@ -22,10 +26,11 @@ async function resolveCompanyContactIds(id: string) {
 
   if (!company?.company_name) return [] as string[];
 
+  // Use case-insensitive match — Bigin sync may produce name casing differences
   const { data: linkedContacts } = await supabase
     .from("synced_contacts")
     .select("id")
-    .eq("account_name", company.company_name)
+    .ilike("account_name", company.company_name)
     .limit(500);
 
   return (linkedContacts ?? []).map((c) => c.id);

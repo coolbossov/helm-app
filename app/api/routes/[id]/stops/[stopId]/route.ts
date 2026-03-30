@@ -32,10 +32,11 @@ async function resolveLinkedContactId(admin: ReturnType<typeof createAdminClient
     return { contactId: null, reason: "no_company_name" } satisfies LinkedContactResolution;
   }
 
+  // Use case-insensitive match — Bigin sync may produce name casing differences
   const { data: linkedContacts } = await admin
     .from("synced_contacts")
     .select("id")
-    .eq("account_name", company.company_name);
+    .ilike("account_name", company.company_name);
 
   if (!linkedContacts || linkedContacts.length === 0) {
     return { contactId: null, reason: "not_found" } satisfies LinkedContactResolution;

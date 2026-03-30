@@ -32,6 +32,9 @@ export interface FieldUpdateResult {
 export async function processFieldUpdates(): Promise<FieldUpdateResult> {
   const admin = createAdminClient();
 
+  // HELM is a single-user app — no user_id scope needed here.
+  // This endpoint is protected by auth in POST /api/sync/push.
+  // If multi-user is ever added, add .eq("user_id", userId) filter.
   const { data: pending, error } = await admin
     .from("field_updates")
     .select("id, contact_id, company_id, changes")

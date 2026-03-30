@@ -34,7 +34,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, []);
 
   return (
-    <div className="flex h-screen flex-col">
+    // h-[100dvh] accounts for iOS Safari dynamic viewport (address bar collapse)
+    <div className="flex h-[100dvh] flex-col">
       <OfflineIndicator />
       <Header />
       <main className="flex-1 overflow-hidden">{children}</main>

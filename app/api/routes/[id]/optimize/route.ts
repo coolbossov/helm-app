@@ -88,15 +88,16 @@ export async function POST(request: NextRequest, { params }: Params) {
   // For strict_time_windows: sort must_visit first, then by time window start
   if (mode === "strict_time_windows") {
     const ordered = sortByTimeWindows(rawStops);
-    for (let i = 0; i < ordered.length; i++) {
-      await supabase
-        .from("route_stops")
-        .update({ stop_order: i })
-        .eq("id", ordered[i].id);
-    }
+    const stopOrders = ordered.map((s, i) => ({ id: s.id, stop_order: i }));
+    await supabase.rpc("bulk_update_stop_order", { stop_orders: stopOrders });
     await supabase
       .from("saved_routes")
-      .update({ optimization_mode: mode })
+      .update({
+        optimization_mode: mode,
+        // Clear stale distance/duration — strict_time_windows doesn't calculate these
+        total_distance_meters: null,
+        total_duration_seconds: null,
+      })
       .eq("id", id);
     return NextResponse.json({
       data: {
@@ -115,12 +116,12 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   const result = await optimizeStops(latLngs, mode);
 
-  for (const [newOrder, originalIdx] of result.orderedIndices.entries()) {
-    await supabase
-      .from("route_stops")
-      .update({ stop_order: newOrder })
-      .eq("id", rawStops[originalIdx].id);
-  }
+  // Bulk update all stop orders in a single DB round-trip (migration 018)
+  const stopOrders = result.orderedIndices.map((originalIdx, newOrder) => ({
+    id: rawStops[originalIdx].id,
+    stop_order: newOrder,
+  }));
+  await supabase.rpc("bulk_update_stop_order", { stop_orders: stopOrders });
 
   await supabase
     .from("saved_routes")
