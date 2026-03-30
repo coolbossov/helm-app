@@ -63,6 +63,9 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Migrations shipped: 014 (`synced_companies` table), 015 (`route_stops.company_id` FK), 016 (`field_updates.company_id` FK), 017 (`route_stops` company-first ordering). Migration 017 must be applied to Supabase production manually — company-only stops won't sort correctly until then.
 - Coordinate null guards: always use `lat != null && lng != null` (not `lat && lng`) — valid `0` coordinates must not be falsy-dropped.
 - `companyCount` presence check: use `synced_companies?.id != null || synced_contacts?.id != null` — never rely on truthy object check for linked records.
+- Supabase migration tracking: `supabase db push` fails when `CREATE POLICY` statements aren't idempotent and `supabase_migrations.schema_migrations` is out of sync with what's actually applied. Fix: manually INSERT sentinel rows for already-applied migrations (`INSERT INTO supabase_migrations.schema_migrations (version, name, statements) VALUES ('NNN', 'name', '{}') ON CONFLICT DO NOTHING`) then re-run push. Always check `schema_migrations` before assuming `db push` will work cleanly on production.
+- `supabase db push --linked --yes` flag required for non-interactive shells (CI, scripts) — omitting `--yes` causes push to hang waiting for confirmation.
+- Migrations 012 and 013 were applied directly to production outside of `db push` — sentinel rows inserted manually to restore tracking table alignment. Current production state: migrations 001–017 all applied and tracked.
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
