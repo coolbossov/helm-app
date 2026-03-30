@@ -203,9 +203,10 @@ export const GoogleMapView = memo(function GoogleMapView({
       renderer: clusterRenderer,
     });
 
+    const markerById = markerByIdRef.current;
     return () => {
       markersRef.current.forEach((m) => m.setMap(null));
-      markerByIdRef.current.clear();
+      markerById.clear();
       if (clustererRef.current) clustererRef.current.clearMarkers();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- contacts only; settings handled by style-update effect
