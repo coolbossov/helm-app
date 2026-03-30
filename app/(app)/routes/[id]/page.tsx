@@ -65,6 +65,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   }
 
   const stops = route.route_stops ?? [];
+  const companyCount = stops.filter((s) => s.synced_companies || s.synced_contacts).length;
   const visitedCount = stops.filter((s) => s.status === "visited").length;
   const skippedCount = stops.filter((s) => s.status === "skipped").length;
   const allDone = stops.length > 0 && visitedCount + skippedCount === stops.length;
@@ -82,7 +83,8 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
         <div className="min-w-0 flex-1">
           <h1 className="truncate text-xl font-bold text-gray-900">{route.name}</h1>
           <RouteStats
-            stopCount={stops.length}
+            stopCount={companyCount}
+            entityLabel="company"
             totalDistanceMeters={route.total_distance_meters}
             totalDurationSeconds={route.total_duration_seconds}
           />
@@ -183,19 +185,20 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
       ) : (
         <div className="space-y-3">
           {stops.map((stop, index) => {
+            const company = stop.synced_companies;
             const contact = stop.synced_contacts;
-            if (!contact) return null;
+            if (!company && !contact) return null;
 
-            const name = getDisplayName(contact);
+            const name = company?.company_name ?? getDisplayName(contact!);
             const address = formatAddress(
-              contact.mailing_street,
-              contact.mailing_city,
-              contact.mailing_state,
-              contact.mailing_zip
+              company?.billing_street ?? contact?.mailing_street ?? null,
+              company?.billing_city ?? contact?.mailing_city ?? null,
+              company?.billing_state ?? contact?.mailing_state ?? null,
+              company?.billing_zip ?? contact?.mailing_zip ?? null
             );
 
-            const lat = contact.latitude;
-            const lng = contact.longitude;
+            const lat = company?.latitude ?? contact?.latitude;
+            const lng = company?.longitude ?? contact?.longitude;
             const encodedAddr = address ? encodeURIComponent(address) : "";
             const googleUrl = address ? `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}` : null;
             const appleUrl = lat && lng ? `maps://maps.apple.com/?daddr=${lat},${lng}` : null;
@@ -209,7 +212,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
                   index={index}
                   name={name}
                   address={address || undefined}
-                  phone={contact.phone || contact.mobile || undefined}
+                  phone={company?.phone || contact?.phone || contact?.mobile || undefined}
                   status={stop.status}
                   priority={stop.priority as StopPriority}
                   timeWindowStart={stop.time_window_start}

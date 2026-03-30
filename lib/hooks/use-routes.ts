@@ -22,6 +22,19 @@ interface RouteWithStops extends SavedRoute {
       phone: string | null;
       mobile: string | null;
     } | null;
+    synced_companies?: {
+      id: string;
+      company_name: string;
+      billing_street: string | null;
+      billing_city: string | null;
+      billing_state: string | null;
+      billing_zip: string | null;
+      latitude: number | null;
+      longitude: number | null;
+      phone: string | null;
+      business_type: string | null;
+      priority: string | null;
+    } | null;
   }>;
 }
 

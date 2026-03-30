@@ -19,7 +19,8 @@ export interface SavedRoute {
 export interface RouteStop {
   id: string;
   route_id: string;
-  contact_id: string;
+  contact_id: string | null;
+  company_id?: string | null;
   stop_order: number;
   status: StopStatus;
   priority: StopPriority;
