@@ -40,7 +40,7 @@ export async function optimizeStops(stops: LatLng[], mode: "fastest" | "shortest
   return optimizeWithNearestNeighbor(stops);
 }
 
-async function optimizeWithDirectionsApi(stops: LatLng[], mode: "fastest" | "shortest" = "fastest"): Promise<OptimizeResult> {
+async function optimizeWithDirectionsApi(stops: LatLng[], _mode: "fastest" | "shortest" = "fastest"): Promise<OptimizeResult> {
   const apiKey = process.env.GOOGLE_MAPS_SERVER_KEY;
   if (!apiKey) throw new Error("GOOGLE_MAPS_SERVER_KEY not set");
 

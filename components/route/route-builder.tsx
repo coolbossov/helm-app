@@ -4,7 +4,6 @@ import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Wand2, Save, X, ListPlus, FileUp } from "lucide-react";
 import { GoogleMapView } from "@/components/map/google-map";
-import { FilterPanel } from "@/components/map/filter-panel";
 import { SearchBar } from "@/components/map/search-bar";
 import { StopList } from "@/components/route/stop-list";
 import { RouteStats } from "@/components/route/route-stats";
@@ -18,8 +17,7 @@ import type { ContactMarkerData } from "@/types";
 export function RouteBuilder() {
   const router = useRouter();
   const { markers, loading } = useContacts();
-  const { filters, filtered, updateFilter, resetFilters, activeFilterCount } =
-    useFilters(markers);
+  const { filters, filtered, updateFilter } = useFilters(markers);
   const { settings } = useMapSettings();
   const {
     stops,
@@ -28,7 +26,6 @@ export function RouteBuilder() {
     addStop,
     removeStop,
     moveStop,
-    hasStop,
     addMultipleStops,
   } = useRouteBuilder();
 
