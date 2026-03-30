@@ -41,6 +41,8 @@ export interface DiscoveryResult {
   types: string[];
   // true if already in synced_contacts
   already_in_crm: boolean;
+  // internal contact id when already_in_crm is true; null for new leads
+  contact_id: string | null;
 }
 
 // Places API (New) response types
@@ -226,10 +228,15 @@ export async function POST(request: NextRequest) {
 
   const { data: existing } = await supabase
     .from("synced_contacts")
-    .select("place_id")
+    .select("id, place_id")
     .in("place_id", placeIds);
 
-  const existingIds = new Set((existing ?? []).map((r) => r.place_id).filter(Boolean));
+  // Map place_id → internal contact id for already-in-CRM entries
+  const existingByPlaceId = new Map<string, string>(
+    (existing ?? [])
+      .filter((r): r is { id: string; place_id: string } => Boolean(r.place_id))
+      .map((r) => [r.place_id, r.id])
+  );
 
   const results: DiscoveryResult[] = allResults
     .filter((p) => p.location)
@@ -244,7 +251,8 @@ export async function POST(request: NextRequest) {
       phone: p.nationalPhoneNumber ?? null,
       website: p.websiteUri ?? null,
       types: p.types ?? (p.primaryType ? [p.primaryType] : []),
-      already_in_crm: existingIds.has(p.id),
+      already_in_crm: existingByPlaceId.has(p.id),
+      contact_id: existingByPlaceId.get(p.id) ?? null,
     }));
 
   return NextResponse.json({ data: results, count: results.length });

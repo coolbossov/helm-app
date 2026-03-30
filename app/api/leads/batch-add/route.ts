@@ -15,7 +15,8 @@ const schema = z.object({
       website: z.string().url().max(500).nullable().default(null),
     })
   ).min(1).max(100),
-  business_type: z.array(z.string()).default([]),
+  // Accepts either a single string (new) or array (legacy) for backward compat
+  business_type: z.union([z.string(), z.array(z.string())]).default(""),
 });
 
 interface CreatedContact {
@@ -53,7 +54,14 @@ export async function POST(request: NextRequest) {
   }
 
   const admin = createAdminClient();
-  const { leads, business_type } = parsed.data;
+  const { leads } = parsed.data;
+  // Normalize business_type to string[] for the DB column
+  const rawType = parsed.data.business_type;
+  const business_type: string[] = Array.isArray(rawType)
+    ? rawType
+    : rawType
+      ? [rawType]
+      : [];
 
   let added = 0;
   let skipped = 0;

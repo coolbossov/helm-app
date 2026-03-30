@@ -4,10 +4,10 @@ import { memo } from "react";
 import { X, RotateCcw } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import { VISIT_STATUS_COLORS } from "@/types";
+import { BUSINESS_TYPE_COLORS, VISIT_STATUS_COLORS } from "@/types";
 import type { ContactFilters, Priority, LifecycleStage, ContactingStatus, VisitStatus } from "@/types";
 
-const BUSINESS_TYPES = ["Dance", "School", "Daycare", "Cheer", "Sports", "Other"];
+const BUSINESS_TYPES = Object.keys(BUSINESS_TYPE_COLORS);
 const PRIORITIES: Priority[] = [
   "Hot Priority",
   "High Priority",

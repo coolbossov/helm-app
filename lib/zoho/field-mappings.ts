@@ -7,30 +7,47 @@ import type { ZohoContact, ZohoMultiselect } from "@/types";
  */
 
 const BUSINESS_TYPE_MAP: Record<string, string> = {
-  // Maps Bigin actual_value → short display label for the HELM app
+  // Maps Bigin actual_value → display label for the HELM app
   // Current values (post-2026-03-20 restructure)
-  "School Picture Day": "School",
+  "School Picture Day":          "School",
+  "School":                      "School",
+  // School subtypes (Accounts picklist)
+  "School - Public 6-8":         "School - Public 6-8",
+  "School - Public 6-12":        "School - Public 6-12",
+  "School - Public 9-12":        "School - Public 9-12",
+  "School - Charter Elementary": "School - Charter Elementary",
+  "School - Charter 6-12":       "School - Charter 6-12",
+  "School - Charter K-12":       "School - Charter K-12",
+  "School - Private Elementary": "School - Private Elementary",
+  "School - Private 6-12":       "School - Private 6-12",
+  "School - Private K-12":       "School - Private K-12",
   "Dance": "Dance",
   "Gymnastics": "Gymnastics",
   "Cheer": "Cheer",
   "Daycare Picture Day": "Daycare",
+  "Daycare": "Daycare",
   "Sports": "Sports",
   "Martial Arts": "Martial Arts",
   "Performing Arts": "Performing Arts",
   "Senior Living": "Senior Living",
-  "Family Photoshoot": "Family",
-  "Mini Sessions": "Mini",
+  "Family Photoshoot": "Family Photoshoot",
+  "Mini Sessions": "Mini Sessions",
   "Headshots": "Headshots",
   "Event": "Event",
   "Photo booth": "Photo Booth",
+  "Photo Booth": "Photo Booth",
   "Media Day": "Media Day",
   "Product": "Product",
+  "Military": "Military",
   "Other": "Other",
   // Legacy values (pre-restructure) — kept for backwards compatibility
   "Dance Studio Picture Day": "Dance",
   "Daycare/Preschool Picture Day": "Daycare",
   "Cheer Picture Day": "Cheer",
   "Sports Picture Day": "Sports",
+  // Legacy abbreviated labels (old app display values) — map to canonical
+  "Family": "Family Photoshoot",
+  "Mini":   "Mini Sessions",
 };
 
 const LIFECYCLE_STAGE_MAP: Record<string, string> = {

@@ -441,9 +441,12 @@ export const GoogleMapView = memo(function GoogleMapView({
     searchPinSignatureRef.current = nextSearchPinSignature;
 
     placeMarkersRef.current = searchPins.map((place) => {
-      const fillColor = place.inCrm ? "#9ca3af" : LEAD_MARKER_COLOR;
-      const strokeColor = place.selected ? HOME_MARKER_COLOR : "#ffffff";
-      const strokeWeight = place.selected ? 3 : 2;
+      // 3-state fill: teal = already in CRM, purple = selected/queued, pink = new lead
+      const fillColor = place.inCrm
+        ? "#00c2cc"
+        : place.selected
+          ? "#9749c1"
+          : LEAD_MARKER_COLOR;
       const marker = new google.maps.Marker({
         position: { lat: place.lat, lng: place.lng },
         map,
@@ -452,12 +455,12 @@ export const GoogleMapView = memo(function GoogleMapView({
           path: google.maps.SymbolPath.BACKWARD_CLOSED_ARROW,
           fillColor,
           fillOpacity: 1,
-          strokeColor,
-          strokeWeight,
+          strokeColor: "#ffffff",
+          strokeWeight: 2,
           scale: place.selected ? 9 : 7,
           rotation: 45,
         },
-        zIndex: place.selected ? 1003 : 1000,
+        zIndex: place.inCrm ? 998 : place.selected ? 1003 : 1000,
       });
       marker.addListener("click", () => onSearchPinClickRef.current?.(place.place_id));
       return marker;
