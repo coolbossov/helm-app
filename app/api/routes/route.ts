@@ -31,10 +31,10 @@ async function resolveCompanyContext(
   let linkedContacts: ContactRow[] = [];
 
   if (companyNames.length > 0) {
-    // Use case-insensitive match — Bigin sync may produce name casing differences
-    // Build OR filter: account_name.ilike.Name1,account_name.ilike.Name2,...
+    // Use case-insensitive match — Bigin sync may produce name casing differences.
+    // Wrap each value in PostgREST double-quotes to escape embedded commas/dots.
     const ilikeFilter = companyNames
-      .map((n) => `account_name.ilike.${n}`)
+      .map((n) => `account_name.ilike."${n.replace(/"/g, '""')}"`)
       .join(",");
     const { data: contacts, error: contactsError } = await supabase
       .from("synced_contacts")

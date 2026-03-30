@@ -7,6 +7,7 @@ create or replace function bulk_update_stop_order(
 returns void
 language sql
 security definer
+set search_path = public  -- Prevent search_path injection on SECURITY DEFINER functions
 as $$
   update route_stops rs
   set stop_order = (v.stop_order)::integer

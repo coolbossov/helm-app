@@ -311,12 +311,19 @@ export const ContactDetail = memo(function ContactDetail({ contactId, onClose }:
             </div>
           )}
           {contact.website && (() => {
-            // Only render links for http/https URLs — reject javascript:, file:, data: etc.
-            const safeUrl = /^https?:\/\//i.test(contact.website)
-              ? contact.website
-              : /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(contact.website)
-                ? `https://${contact.website}`
-                : null;
+            // Use URL constructor as the authoritative URL parser — only allow http/https.
+            let safeUrl: string | null = null;
+            try {
+              const raw = /^https?:\/\//i.test(contact.website)
+                ? contact.website
+                : `https://${contact.website}`;
+              const parsed = new URL(raw);
+              if (parsed.protocol === "https:" || parsed.protocol === "http:") {
+                safeUrl = parsed.href;
+              }
+            } catch {
+              safeUrl = null;
+            }
             return safeUrl ? (
               <div className="flex items-center gap-2 text-sm">
                 <Globe className="h-4 w-4 text-gray-400" />
