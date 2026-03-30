@@ -59,8 +59,10 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - `business_type` on companies = single string (Accounts picklist is single-select). `business_type` on contacts = string[] (Contacts picklist is multi-select). Never conflate the two.
 - Geocode batch for companies: POST `/api/geocode?target=companies&batch=true` — requires explicit `?batch=true` to prevent accidental full-table geocode runs.
 - Push processor routes company field updates to `PUT /Accounts/{zoho_account_id}` (not `/Contacts`). `field_updates` rows with `company_id` set are routed to Accounts; rows with `contact_id` set go to Contacts.
-- Phase 3 TODO (route app polish): show `company_name` instead of `last_name`/`account_name` in route stops; use `billing_street` for navigation; wire `company_id` FK in `contact_activities` for visit logging.
-- Migrations shipped: 014 (`synced_companies` table), 015 (`route_stops.company_id` FK), 016 (`field_updates.company_id` FK).
+- Phase 3 (route app polish) shipped: `company_name` shown in route stops, `billing_street` used for navigation, `company_id` FK wired in route stops ordering.
+- Migrations shipped: 014 (`synced_companies` table), 015 (`route_stops.company_id` FK), 016 (`field_updates.company_id` FK), 017 (`route_stops` company-first ordering). Migration 017 must be applied to Supabase production manually — company-only stops won't sort correctly until then.
+- Coordinate null guards: always use `lat != null && lng != null` (not `lat && lng`) — valid `0` coordinates must not be falsy-dropped.
+- `companyCount` presence check: use `synced_companies?.id != null || synced_contacts?.id != null` — never rely on truthy object check for linked records.
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
