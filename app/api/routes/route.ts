@@ -43,9 +43,16 @@ async function resolveCompanyContext(
     linkedContacts = (contacts ?? []) as ContactRow[];
   }
 
+  const accountCounts = new Map<string, number>();
+  for (const contact of linkedContacts) {
+    if (!contact.account_name) continue;
+    accountCounts.set(contact.account_name, (accountCounts.get(contact.account_name) ?? 0) + 1);
+  }
+
   const contactByAccount = new Map<string, string>();
   for (const contact of linkedContacts) {
-    if (contact.account_name && !contactByAccount.has(contact.account_name)) {
+    if (!contact.account_name) continue;
+    if (accountCounts.get(contact.account_name) === 1) {
       contactByAccount.set(contact.account_name, contact.id);
     }
   }

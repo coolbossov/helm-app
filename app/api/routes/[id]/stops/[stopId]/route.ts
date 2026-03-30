@@ -16,6 +16,11 @@ const patchStopSchema = z.object({
 
 type Params = { params: Promise<{ id: string; stopId: string }> };
 
+type LinkedContactResolution = {
+  contactId: string | null;
+  reason: "resolved" | "no_company_name" | "not_found" | "ambiguous";
+};
+
 async function resolveLinkedContactId(admin: ReturnType<typeof createAdminClient>, companyId: string) {
   const { data: company } = await admin
     .from("synced_companies")
@@ -23,16 +28,27 @@ async function resolveLinkedContactId(admin: ReturnType<typeof createAdminClient
     .eq("id", companyId)
     .single();
 
-  if (!company?.company_name) return null;
+  if (!company?.company_name) {
+    return { contactId: null, reason: "no_company_name" } satisfies LinkedContactResolution;
+  }
 
-  const { data: linkedContact } = await admin
+  const { data: linkedContacts } = await admin
     .from("synced_contacts")
     .select("id")
-    .eq("account_name", company.company_name)
-    .limit(1)
-    .maybeSingle();
+    .eq("account_name", company.company_name);
 
-  return linkedContact?.id ?? null;
+  if (!linkedContacts || linkedContacts.length === 0) {
+    return { contactId: null, reason: "not_found" } satisfies LinkedContactResolution;
+  }
+
+  if (linkedContacts.length > 1) {
+    return { contactId: null, reason: "ambiguous" } satisfies LinkedContactResolution;
+  }
+
+  return {
+    contactId: linkedContacts[0]?.id ?? null,
+    reason: "resolved",
+  } satisfies LinkedContactResolution;
 }
 
 export async function PATCH(request: NextRequest, { params }: Params) {
@@ -82,20 +98,30 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   // Auto-log visit activity when stop is marked visited
+  let visitActivityMeta: Record<string, unknown> | null = null;
   if (parsed.data.status === "visited") {
     const admin = createAdminClient();
     let targetContactId: string | null = data?.contact_id ?? null;
     const metadata: Record<string, unknown> = { route_id: id, stop_id: stopId };
 
     if (!targetContactId && data?.company_id) {
-      targetContactId = await resolveLinkedContactId(admin, data.company_id);
+      const linkedResolution = await resolveLinkedContactId(admin, data.company_id);
+      targetContactId = linkedResolution.contactId;
+      if (linkedResolution.reason === "ambiguous") {
+        visitActivityMeta = {
+          status: "skipped",
+          reason: "ambiguous_company_contact",
+          company_id: data.company_id,
+        };
+      }
+
       if (targetContactId) {
         metadata.company_id = data.company_id;
       }
     }
 
     if (targetContactId) {
-      await admin.from("contact_activities").insert({
+      const { error: activityInsertError } = await admin.from("contact_activities").insert({
         contact_id: targetContactId,
         user_id: user.id,
         activity_type: "visit",
@@ -103,10 +129,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
         content: parsed.data.visit_notes ?? null,
         metadata,
       });
+
+      visitActivityMeta = activityInsertError
+        ? { status: "error", reason: activityInsertError.message }
+        : { status: "logged" };
     }
   }
 
-  return NextResponse.json({ data });
+  return NextResponse.json({ data, meta: visitActivityMeta ? { visit_activity: visitActivityMeta } : null });
 }
 
 export async function DELETE(_request: NextRequest, { params }: Params) {

@@ -10,9 +10,6 @@ import {
   CheckCircle,
   Map as MapIcon,
   Clock,
-  Flag,
-  ChevronDown,
-  ChevronUp,
 } from "lucide-react";
 import { DrivingStop } from "@/components/route/stop-list";
 import { RouteStats } from "@/components/route/route-stats";
@@ -38,7 +35,6 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   const [optimizing, setOptimizing] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<OptimizationMode>("fastest");
-  const [modePickerOpen, setModePickerOpen] = useState(false);
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
 
   const handleOptimize = async (mode?: OptimizationMode) => {
