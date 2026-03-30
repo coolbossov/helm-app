@@ -84,6 +84,14 @@ export function mapBusinessTypes(
   });
 }
 
+export function mapBusinessType(
+  value: string | ZohoMultiselect | undefined
+): string | null {
+  if (!value) return null;
+  const raw = typeof value === "string" ? value : (value.display_value || value.actual_value);
+  return BUSINESS_TYPE_MAP[raw] || raw;
+}
+
 export function mapLifecycleStage(value: string | undefined): string | null {
   if (!value) return null;
   return LIFECYCLE_STAGE_MAP[value] || value;

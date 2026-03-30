@@ -31,13 +31,28 @@ export interface ZohoContact {
   [key: string]: unknown;
 }
 
+export interface ZohoAccount {
+  id: string;
+  Account_Name: string;
+  Phone?: string;
+  Website?: string;
+  Business_Type?: string | ZohoMultiselect;
+  Billing_Street?: string;
+  Billing_City?: string;
+  Billing_State?: string;
+  Billing_Code?: string;
+  Google_Maps?: string;
+  Modified_Time?: string;
+  [key: string]: unknown;
+}
+
 export interface ZohoMultiselect {
   display_value: string;
   actual_value: string;
 }
 
-export interface ZohoListResponse {
-  data: ZohoContact[];
+export interface ZohoListResponse<T = ZohoContact> {
+  data: T[];
   info: {
     per_page: number;
     count: number;

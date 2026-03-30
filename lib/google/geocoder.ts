@@ -94,26 +94,85 @@ export async function geocodeAddress(
  * Batch geocode contacts that have addresses but no lat/lng.
  * Throttles to ~50 req/sec.
  */
-export async function batchGeocodeContacts(): Promise<number> {
+async function batchGeocodeByTarget(target: "contacts" | "companies"): Promise<number> {
   const supabase = createAdminClient();
 
-  const { data: contacts, error } = await supabase
+  if (target === "companies") {
+    const { data: records, error } = await supabase
+      .from("synced_companies")
+      .select("id, billing_street, billing_city, billing_state, billing_zip")
+      .eq("geocode_status", "pending")
+      .not("billing_street", "is", null)
+      .limit(500);
+
+    if (error || !records?.length) return 0;
+
+    let geocoded = 0;
+    for (const record of records) {
+      const address = [
+        record.billing_street,
+        record.billing_city,
+        record.billing_state,
+        record.billing_zip,
+      ]
+        .filter(Boolean)
+        .join(", ");
+
+      if (!address) {
+        await supabase
+          .from("synced_companies")
+          .update({ geocode_status: "no_address" })
+          .eq("id", record.id);
+        continue;
+      }
+
+      try {
+        const result = await geocodeAddress(address);
+        if (result.status === "OK") {
+          await supabase
+            .from("synced_companies")
+            .update({ latitude: result.latitude, longitude: result.longitude, geocode_status: "success" })
+            .eq("id", record.id);
+          geocoded++;
+        } else {
+          await supabase
+            .from("synced_companies")
+            .update({ geocode_status: "failed" })
+            .eq("id", record.id);
+        }
+      } catch (err) {
+        console.error(`Geocode failed for companies ${record.id}:`, err);
+        await supabase
+          .from("synced_companies")
+          .update({ geocode_status: "failed" })
+          .eq("id", record.id);
+      }
+
+      if (!geocoded || geocoded % 50 !== 0) {
+        await new Promise((r) => setTimeout(r, 20));
+      }
+    }
+
+    return geocoded;
+  }
+
+  const { data: records, error } = await supabase
     .from("synced_contacts")
     .select("id, mailing_street, mailing_city, mailing_state, mailing_zip")
     .eq("geocode_status", "pending")
     .not("mailing_street", "is", null)
     .limit(500);
 
-  if (error || !contacts?.length) return 0;
+  if (error || !records?.length) return 0;
 
   let geocoded = 0;
 
-  for (const contact of contacts) {
+  for (const record of records) {
     const address = [
-      contact.mailing_street,
-      contact.mailing_city,
-      contact.mailing_state,
-      contact.mailing_zip,
+      record.mailing_street,
+      record.mailing_city,
+      record.mailing_state,
+      record.mailing_zip,
     ]
       .filter(Boolean)
       .join(", ");
@@ -122,14 +181,14 @@ export async function batchGeocodeContacts(): Promise<number> {
       await supabase
         .from("synced_contacts")
         .update({ geocode_status: "no_address" })
-        .eq("id", contact.id);
+        .eq("id", record.id);
       continue;
     }
 
     try {
       const result = await geocodeAddress(address);
 
-      if (result.status === "OK") {
+        if (result.status === "OK") {
         await supabase
           .from("synced_contacts")
           .update({
@@ -137,20 +196,20 @@ export async function batchGeocodeContacts(): Promise<number> {
             longitude: result.longitude,
             geocode_status: "success",
           })
-          .eq("id", contact.id);
+          .eq("id", record.id);
         geocoded++;
       } else {
         await supabase
           .from("synced_contacts")
           .update({ geocode_status: "failed" })
-          .eq("id", contact.id);
+          .eq("id", record.id);
       }
     } catch (err) {
-      console.error(`Geocode failed for contact ${contact.id}:`, err);
+      console.error(`Geocode failed for contacts ${record.id}:`, err);
       await supabase
         .from("synced_contacts")
         .update({ geocode_status: "failed" })
-        .eq("id", contact.id);
+        .eq("id", record.id);
     }
 
     // Throttle: ~50 req/sec = 20ms between requests
@@ -160,4 +219,12 @@ export async function batchGeocodeContacts(): Promise<number> {
   }
 
   return geocoded;
+}
+
+export async function batchGeocodeContacts(): Promise<number> {
+  return batchGeocodeByTarget("contacts");
+}
+
+export async function batchGeocodeCompanies(): Promise<number> {
+  return batchGeocodeByTarget("companies");
 }

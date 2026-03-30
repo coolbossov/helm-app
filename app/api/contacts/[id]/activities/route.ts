@@ -12,6 +12,25 @@ const createSchema = z.object({
 
 type Params = { params: Promise<{ id: string }> };
 
+async function resolveCompanyContactIds(id: string) {
+  const supabase = await createClient();
+  const { data: company } = await supabase
+    .from("synced_companies")
+    .select("company_name")
+    .eq("id", id)
+    .single();
+
+  if (!company?.company_name) return [] as string[];
+
+  const { data: linkedContacts } = await supabase
+    .from("synced_contacts")
+    .select("id")
+    .eq("account_name", company.company_name)
+    .limit(500);
+
+  return (linkedContacts ?? []).map((c) => c.id);
+}
+
 export async function GET(request: NextRequest, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
@@ -23,12 +42,27 @@ export async function GET(request: NextRequest, { params }: Params) {
   const limit = 20;
   const from = (page - 1) * limit;
 
-  const { data, error, count } = await supabase
+  let query = supabase
     .from("contact_activities")
     .select("*", { count: "exact" })
     .eq("contact_id", id)
     .order("created_at", { ascending: false })
     .range(from, from + limit - 1);
+
+  let { data, error, count } = await query;
+
+  if (error?.code === "PGRST116" || ((data?.length ?? 0) === 0 && !error)) {
+    const linkedIds = await resolveCompanyContactIds(id);
+    if (linkedIds.length > 0) {
+      query = supabase
+        .from("contact_activities")
+        .select("*", { count: "exact" })
+        .in("contact_id", linkedIds)
+        .order("created_at", { ascending: false })
+        .range(from, from + limit - 1);
+      ({ data, error, count } = await query);
+    }
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
@@ -52,7 +86,7 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const admin = createAdminClient();
-  const { data, error } = await admin
+  let { data, error } = await admin
     .from("contact_activities")
     .insert({
       contact_id: id,
@@ -64,6 +98,27 @@ export async function POST(request: NextRequest, { params }: Params) {
     })
     .select()
     .single();
+
+  if (error?.code === "23503") {
+    const linkedIds = await resolveCompanyContactIds(id);
+    const targetContactId = linkedIds[0];
+    if (!targetContactId) {
+      return NextResponse.json({ error: "No linked contact found for this company" }, { status: 400 });
+    }
+
+    ({ data, error } = await admin
+      .from("contact_activities")
+      .insert({
+        contact_id: targetContactId,
+        user_id: user.id,
+        activity_type: parsed.data.activity_type,
+        title: parsed.data.title ?? null,
+        content: parsed.data.content ?? null,
+        metadata: { ...(parsed.data.metadata ?? {}), company_id: id },
+      })
+      .select()
+      .single());
+  }
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 

@@ -6,8 +6,8 @@ export async function GET(request: NextRequest) {
   const { searchParams } = request.nextUrl;
 
   // Build query
-  let query = supabase.from("synced_contacts").select(
-    `id, zoho_id, last_name, first_name, account_name,
+  let query = supabase.from("synced_companies").select(
+    `id, zoho_account_id, company_name, phone,
      latitude, longitude, business_type, priority,
      lifecycle_stage, contacting_status,
      visit_status, last_visit_date`
@@ -17,7 +17,7 @@ export async function GET(request: NextRequest) {
   const businessTypes = searchParams.get("business_types");
   if (businessTypes) {
     const types = businessTypes.split(",");
-    query = query.overlaps("business_type", types);
+    query = query.in("business_type", types);
   }
 
   const priority = searchParams.get("priority");
@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     // Strip PostgREST filter syntax characters to prevent filter injection
     const safeSearch = search.replace(/[(),]/g, "").slice(0, 100);
     query = query.or(
-      `last_name.ilike.%${safeSearch}%,account_name.ilike.%${safeSearch}%,email.ilike.%${safeSearch}%`
+      `company_name.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`
     );
   }
 
@@ -80,7 +80,7 @@ export async function GET(request: NextRequest) {
       .lte("longitude", parseFloat(east));
   }
 
-  query = query.order("last_name", { ascending: true }).limit(10000);
+  query = query.order("company_name", { ascending: true }).limit(10000);
 
   const { data, error } = await query;
 
@@ -88,8 +88,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
+  const normalized = (data ?? []).map((row) => ({
+    id: row.id,
+    zoho_id: row.zoho_account_id,
+    last_name: row.company_name,
+    first_name: null,
+    account_name: row.company_name,
+    latitude: row.latitude,
+    longitude: row.longitude,
+    business_type: row.business_type ? [row.business_type] : [],
+    priority: row.priority,
+    lifecycle_stage: row.lifecycle_stage,
+    contacting_status: row.contacting_status,
+    visit_status: row.visit_status,
+    last_visit_date: row.last_visit_date,
+  }));
+
   return NextResponse.json(
-    { data, count: data?.length ?? 0 },
+    { data: normalized, count: normalized.length },
     {
       headers: {
         "Cache-Control": "private, max-age=60, stale-while-revalidate=300",
