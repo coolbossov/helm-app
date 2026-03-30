@@ -22,13 +22,27 @@ async function resolveCompanyContactIds(id: string) {
 
   if (!company?.company_name) return [] as string[];
 
-  const { data: linkedContacts } = await supabase
-    .from("synced_contacts")
-    .select("id")
-    .eq("account_name", company.company_name)
-    .limit(500);
+  const ids: string[] = [];
+  const pageSize = 1000;
+  let from = 0;
 
-  return (linkedContacts ?? []).map((c) => c.id);
+  while (true) {
+    const to = from + pageSize - 1;
+    const { data: linkedContacts, error } = await supabase
+      .from("synced_contacts")
+      .select("id")
+      .eq("account_name", company.company_name)
+      .range(from, to);
+
+    if (error || !linkedContacts?.length) break;
+
+    ids.push(...linkedContacts.map((c) => c.id));
+
+    if (linkedContacts.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return ids;
 }
 
 export async function GET(request: NextRequest, { params }: Params) {

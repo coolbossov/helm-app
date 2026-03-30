@@ -11,6 +11,7 @@ export async function POST(request: NextRequest) {
   const target = request.nextUrl.searchParams.get("target") === "companies"
     ? "companies"
     : "contacts";
+  const batchMode = request.nextUrl.searchParams.get("batch") === "true";
 
   let body: unknown = null;
   try {
@@ -20,6 +21,13 @@ export async function POST(request: NextRequest) {
   }
 
   if (!body || (typeof body === "object" && body !== null && !("address" in body))) {
+    if (!batchMode) {
+      return NextResponse.json(
+        { error: "Invalid payload: provide { address } or set ?batch=true for batch geocoding" },
+        { status: 400 }
+      );
+    }
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
