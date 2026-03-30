@@ -72,6 +72,19 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Zoho sync counters (`created`, `updated`, `unchanged`) must be declared as `let` (mutable) — `const` counters that are never incremented produce permanently-zero counts in sync result logs.
 - GitHub squash-merge state lag: when the CI `auto-merge` job shows SUCCESS but a PR still shows OPEN, do NOT re-merge. Verify via `git fetch origin && git show origin/main:path/to/file | grep expected_change`. If the change is present, the merge succeeded — GitHub UI is lagging. Close the PR manually with a note. Only attempt manual merge if the change is confirmed absent from `origin/main`.
 
+- `useIsMobile()` hook at `lib/hooks/use-mobile.ts` — uses `window.matchMedia` with event listener, SSR-safe (initializes to `false`). Exported from `lib/hooks/index.ts`. Use this everywhere instead of `window.innerWidth` checks.
+- `bulk_update_stop_order(stop_orders jsonb)` RPC available after migration 018 is applied to production. Use this for all batch stop_order updates — replaces PL/pgSQL loop with single `UPDATE … FROM jsonb_array_elements()`.
+- All `SECURITY DEFINER` functions must include `SET search_path = public` — enforced as of migration 018.
+- Migration 019 adds GIN trigram indexes on `company_name` and `account_name` — ilike search is now fast. Both migrations 018 + 019 must be applied to Supabase production before optimize feature works correctly.
+- PWA manifest at `public/manifest.json`. Theme color `#ff0092`. Start URL `/map`. `display: standalone`.
+- `useContacts()` returns `truncated: boolean` — surface this in any UI that displays contact counts. Orange banner shown in map UI when truncated.
+- `updateStopStatus` uses snapshot-rollback pattern: snapshots state before optimistic update, restores on server error (non-TypeError), queues offline on network error (TypeError).
+- Website URL safety: storage enforces `startsWith("http")` via Zod in `batch-add` API; render enforces `new URL()` + protocol allowlist in `contact-detail.tsx`. Old records with bad URLs render as nothing, not as broken links.
+- `maximumScale: 5, userScalable: true` in `app/layout.tsx` — pinch-to-zoom re-enabled. `userScalable: false` is a WCAG violation. Do not revert.
+- `h-[100dvh]` used in `app/(app)/layout.tsx` — not `h-screen`. Required for correct mobile viewport height (avoids iOS Safari toolbar overlap). Do not revert.
+- Contacts API has a `HARD_LIMIT` constant — response includes `truncated: boolean` when results are capped. `overdue_days` NaN guard added; search wildcard sanitization applied.
+- Auth check in `app/api/geocode/route.ts` is before body parse — do not reorder.
+
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
 - `npm run build` — Production build
