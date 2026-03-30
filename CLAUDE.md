@@ -66,6 +66,7 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Supabase migration tracking: `supabase db push` fails when `CREATE POLICY` statements aren't idempotent and `supabase_migrations.schema_migrations` is out of sync with what's actually applied. Fix: manually INSERT sentinel rows for already-applied migrations (`INSERT INTO supabase_migrations.schema_migrations (version, name, statements) VALUES ('NNN', 'name', '{}') ON CONFLICT DO NOTHING`) then re-run push. Always check `schema_migrations` before assuming `db push` will work cleanly on production.
 - `supabase db push --linked --yes` flag required for non-interactive shells (CI, scripts) — omitting `--yes` causes push to hang waiting for confirmation.
 - Migrations 012 and 013 were applied directly to production outside of `db push` — sentinel rows inserted manually to restore tracking table alignment. Current production state: migrations 001–017 all applied and tracked.
+- Ambiguous company→contact resolution in visit activity logging: when a route stop has `company_id` but no `contact_id`, the API resolves the linked contact via `synced_companies.account_name` match against `synced_contacts.account_name`. If 0 or 2+ contacts match, the activity is logged with `contact_id: null` (safe fallback) rather than throwing. Never assume a company stop has a resolvable contact — always handle the null case in activity logging routes.
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
