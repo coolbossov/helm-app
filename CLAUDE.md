@@ -55,6 +55,12 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - CI squash-merge timing: commits pushed after CI begins merging may not be included in the squash. Always verify the merge SHA includes all intended commits before closing a PR.
 - Push sync uses preview-then-confirm pattern: `GET /api/sync/push/preview` (read-only) → user confirms → `POST /api/sync/push`. Never skip the preview step.
 - Pull sync returns field-level diff: `SyncResult` includes `created`/`updated`/`unchanged` counts + `details[]` array with per-contact `fieldsChanged[]`. Diff is computed on-the-fly — no DB table, no migration needed.
+- Primary entity is now `synced_companies` (Bigin Accounts module). `synced_contacts` is kept for legacy activities fallback (linked by `account_name`). All map-facing APIs return compatibility-shaped responses: field name normalization so frontend receives `last_name`, `zoho_id`, `account_name`, `business_type: string[]` regardless of source table.
+- `business_type` on companies = single string (Accounts picklist is single-select). `business_type` on contacts = string[] (Contacts picklist is multi-select). Never conflate the two.
+- Geocode batch for companies: POST `/api/geocode?target=companies&batch=true` — requires explicit `?batch=true` to prevent accidental full-table geocode runs.
+- Push processor routes company field updates to `PUT /Accounts/{zoho_account_id}` (not `/Contacts`). `field_updates` rows with `company_id` set are routed to Accounts; rows with `contact_id` set go to Contacts.
+- Phase 3 TODO (route app polish): show `company_name` instead of `last_name`/`account_name` in route stops; use `billing_street` for navigation; wire `company_id` FK in `contact_activities` for visit logging.
+- Migrations shipped: 014 (`synced_companies` table), 015 (`route_stops.company_id` FK), 016 (`field_updates.company_id` FK).
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
