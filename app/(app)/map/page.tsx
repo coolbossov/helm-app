@@ -493,9 +493,13 @@ export default function MapPage() {
             const target = searchResults.find((result) => result.place_id === placeId);
             if (!target) return;
             // Teal pin (already in CRM) → open existing contact detail
-            if (target.already_in_crm && target.contact_id) {
-              setSelectedId(target.contact_id);
-              setMobileDetailOpen(true);
+            if (target.already_in_crm) {
+              if (target.contact_id) {
+                setSelectedId(target.contact_id);
+                setMobileDetailOpen(true);
+              }
+              // already_in_crm but no contact_id = stale data; silently ignore
+              // (do not toggle selection on an in-CRM pin either way)
               return;
             }
             // Pink pin (new lead) → toggle selection
