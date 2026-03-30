@@ -12,6 +12,7 @@ const BUSINESS_TYPE_MAP: Record<string, string> = {
   "School Picture Day":          "School",
   "School":                      "School",
   // School subtypes (Accounts picklist)
+  "School - Public Elementary":  "School - Public Elementary",
   "School - Public 6-8":         "School - Public 6-8",
   "School - Public 6-12":        "School - Public 6-12",
   "School - Public 9-12":        "School - Public 9-12",
