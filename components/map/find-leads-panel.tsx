@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Check,
@@ -77,6 +78,7 @@ export function FindLeadsPanel({
   onSelectedIdsChange,
   onSearchCompleted,
 }: FindLeadsPanelProps) {
+  const router = useRouter();
   const [keyword, setKeyword] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -295,13 +297,20 @@ export function FindLeadsPanel({
             : "Failed to create route";
         throw new Error(message);
       }
+      const routeId =
+        payload.data && typeof (payload.data as Record<string, unknown>).id === "string"
+          ? (payload.data as Record<string, unknown>).id as string
+          : null;
       setRouteCreated(true);
+      if (routeId) {
+        router.push(`/routes/${routeId}`);
+      }
     } catch (createError) {
       setRouteError(createError instanceof Error ? createError.message : "Failed to create route");
     } finally {
       setIsCreatingRoute(false);
     }
-  }, [isCreatingRoute, lastAddedCompanyIds, routeName]);
+  }, [isCreatingRoute, lastAddedCompanyIds, routeName, router]);
 
   return (
     <div className="flex h-full flex-col">

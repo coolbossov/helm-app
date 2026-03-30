@@ -1,5 +1,5 @@
-import { RouteBuilder } from "@/components/route/route-builder";
+import { redirect } from "next/navigation";
 
 export default function NewRoutePage() {
-  return <RouteBuilder />;
+  redirect("/map?mode=builder");
 }

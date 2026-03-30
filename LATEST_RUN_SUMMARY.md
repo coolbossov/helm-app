@@ -1,49 +1,68 @@
 # helm-app — Latest Run Summary
 
-**Date:** 2026-03-28
-**Session:** PR #2 code review + merge confirmation
+**Date:** 2026-03-30  
+**Session:** 48h Comprehensive Review — Post-PR Cleanup  
+**Branch at close:** `main` @ `35e761e`
 
 ---
 
 ## Current State
 
-**Branch:** `main` (PR #2 merged 2026-03-28T05:19:57Z)
-**Live URL:** https://helm-app-drab.vercel.app
-**Last merged:** PR #2 `fix/zoho-created-counter-mutable` (2026-03-28)
+- `main` is fully clean — no open PRs, no pending branches
+- **Supabase production:** migrations 001–019 all applied ✅
+- **Vercel production:** deploy `dpl_WJtVPVVFDTUGo9nvpsX53kjt5eGN` — READY, 0 runtime errors
+- **CLAUDE.md:** 13 architecture notes committed to main (`919582f`)
 
 ---
 
 ## What Was Done This Session
 
-### Code Review: `@review-2-code-commit` — APPROVE, zero findings
+PR #34 (`fix/review-48h-fixes`) merged — 31 fixes across 25 files:
 
-PR #2 (`fix/zoho-created-counter-mutable`) reviewed and approved. Local checks passed: build, lint, tsc. CI auto-merge completed.
+**Security:** auth check before body parse in `/api/geocode`; XSS URL allowlist (Zod + `new URL()`); `bulk_update_stop_order` RPC with `SET search_path = public`; `place_id` length cap + regex; `metadata` POST 50-key/1KB cap.
 
-**Fix in `lib/zoho/contacts.ts`:**
-- `const created = 0` → `let created` — counter was always 0, never incremented
-- Added pre-upsert `select` per batch to identify existing vs new contacts
-- `created` and `updated` counters now accurately reflect real creates vs updates
-- Return value uses computed `updated` instead of hardcoded `contacts.length`
+**Bugs:** `handleOptimize` try/finally (spinner never freezes); `deleteRoute` checks `res.ok`; `updateStopStatus` snapshot-rollback; `companyCount` unified on `linkedStops`; `strict_time_windows` clears stale data; `overdue_days` NaN guard; PostgREST ILIKE comma quoting + wildcard sanitization; website URL dual-layer safety.
 
-**PR #2:** https://github.com/coolbossov/helm-app/pull/2 — **MERGED**
+**Performance:** N sequential UPDATEs → `bulk_update_stop_order` RPC (migration 018); GIN trigram + performance indexes (migration 019); Cache-Control headers; contacts 10k hard limit + truncation flag.
 
----
+**Mobile/UX:** `h-[100dvh]` iOS Safari fix; pinch-to-zoom re-enabled (WCAG); PWA manifest; touch targets ≥44px; Apple Maps iOS-only; mobile nav `text-xs`.
 
-## Open Items / Next Steps
+**New files:** `lib/hooks/use-mobile.ts`, `public/manifest.json`, `supabase/migrations/018_bulk_update_stop_order.sql`, `supabase/migrations/019_search_indexes.sql`
 
-1. Routes filtering — filter by status, date, or territory
-2. Offline mode — cache contacts + map tiles for field use without connectivity
-3. Performance — marker clustering, lazy loading for large contact sets
-4. Bigin cleanup: review unused custom fields to free slots (currently at 22/22 limit)
+Post-PR cleanup: migrations 018+019 applied to production; CLAUDE.md +13 lines committed; changelogs created.
 
 ---
 
-## Key Architecture Notes
+## Key Architecture Facts (for next session)
 
-- `lib/zoho/contacts.ts` — Zoho Bigin contact sync; `contactToRow()` never includes visit fields
+- `useIsMobile()` at `lib/hooks/use-mobile.ts` — SSR-safe, exported from `lib/hooks/index.ts`
+- `bulk_update_stop_order(stop_orders jsonb)` RPC — use for all stop reordering (migration 018)
+- All `SECURITY DEFINER` functions require `SET search_path = public`
+- `h-[100dvh]` in `app/(app)/layout.tsx` — do not revert
+- `maximumScale: 5, userScalable: true` — do not revert (WCAG)
+- Auth check in `app/api/geocode/route.ts` is before `request.json()` — do not reorder
+- Migrations 001–019 all applied to production
 - Supabase project ID: `lufdqoilfgjjuohteyrs` (listed as "Booksa" in dashboard — ignore the name)
 - Supabase MCP tool points to wrong project — use Management API directly for helm-app Supabase ops
-- Bigin Companies module API name is `Accounts` — not `Companies`
-- Maps JS API v3.56+: `mapId` not required — use `styles` array instead
 - Next.js 16: use `eslint .` via `@eslint/eslintrc` flat compat (not `next lint`)
-- Discovery contacts use `zoho_id = "place_<place_id>"` prefix — `SUPABASE_ONLY_FIELDS` prevents Bigin push
+
+---
+
+## Remaining Backlog (non-blocking)
+
+| Item | Priority |
+|------|----------|
+| Auto-scroll to next pending stop after marking visited | P1 (driving safety) |
+| Routes filtering (status/date/territory) | P2 |
+| Offline replay conflict resolution (last-write-wins silent) | P2 |
+| IDB-cache race condition (concurrent `openDB()` calls) | P2 |
+| Test scaffold (vitest + testing-library) | P3 |
+| Remove `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` from Vercel env vars | P3 (dead config) |
+
+---
+
+## Next Session Start
+
+1. Check GitHub Projects Master Board for any new issues
+2. Pick from backlog — P1 auto-scroll is the highest-value next item
+3. `git pull` — main is clean, no conflicts expected

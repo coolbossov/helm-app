@@ -82,6 +82,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   const allDone = linkedStops.length > 0 && visitedCount + skippedCount === linkedStops.length;
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="mx-auto max-w-2xl px-4 py-6 pb-24">
       {/* Header */}
       <div className="mb-4 flex items-center gap-3">
@@ -377,6 +378,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
           })}
         </div>
       )}
+    </div>
     </div>
   );
 }

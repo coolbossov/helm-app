@@ -42,13 +42,14 @@ export default function RoutesPage() {
   }
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="mx-auto max-w-2xl px-4 py-6">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900">Routes</h1>
           <p className="text-sm text-gray-500">{routes.length} saved routes</p>
         </div>
-        <Button onClick={() => router.push("/routes/new")}>
+        <Button onClick={() => router.push("/map?mode=builder")}>
           <Plus className="h-4 w-4" />
           New Route
         </Button>
@@ -86,7 +87,7 @@ export default function RoutesPage() {
           <Route className="h-12 w-12 mb-3 opacity-30" />
           <p className="text-base font-medium text-gray-500 mb-1">No routes yet</p>
           <p className="text-sm mb-6">Build a route to plan your day in the field</p>
-          <Button onClick={() => router.push("/routes/new")}>
+          <Button onClick={() => router.push("/map?mode=builder")}>
             <Plus className="h-4 w-4" />
             Create your first route
           </Button>
@@ -98,6 +99,7 @@ export default function RoutesPage() {
           ))}
         </div>
       )}
+    </div>
     </div>
   );
 }

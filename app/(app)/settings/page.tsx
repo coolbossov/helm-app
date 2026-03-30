@@ -517,6 +517,7 @@ export default function SettingsPage() {
   };
 
   return (
+    <div className="h-full overflow-y-auto">
     <div className="mx-auto max-w-2xl space-y-6 p-4 pb-20 sm:p-6">
       <h1 className="text-xl font-bold text-gray-900">Settings</h1>
 
@@ -708,6 +709,7 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
     </div>
   );
 }

@@ -1,19 +1,38 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { MapPin, Route, Settings, LogOut } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { MapPin, Route, Settings, LogOut, Telescope } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
 const navItems = [
   { href: "/map", label: "Map", icon: MapPin },
   { href: "/routes", label: "Routes", icon: Route },
+  { href: "/map?mode=leads", label: "Leads", icon: Telescope, matchPath: "/map", matchMode: "leads" },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
+function isNavItemActive(
+  item: { href: string; matchPath?: string; matchMode?: string },
+  pathname: string,
+  searchParams: ReturnType<typeof useSearchParams>
+): boolean {
+  // Mode-specific map tab (e.g. Leads)
+  if (item.matchPath && item.matchMode) {
+    return pathname === item.matchPath && searchParams.get("mode") === item.matchMode;
+  }
+  // Plain /map tab: active on /map only when mode=leads is NOT set
+  if (item.href === "/map") {
+    return pathname === "/map" && searchParams.get("mode") !== "leads";
+  }
+  // Prefix match for other tabs (Routes, Settings)
+  return pathname === item.href || pathname.startsWith(item.href + "/");
+}
+
 export function Header() {
   const pathname = usePathname();
+  const searchParams = useSearchParams();
   const router = useRouter();
 
   async function handleLogout() {
@@ -40,9 +59,9 @@ export function Header() {
             <Link
               key={item.href}
               href={item.href}
-              className={cn(
+                className={cn(
                 "flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors",
-                pathname === item.href
+                isNavItemActive(item, pathname, searchParams)
                   ? "bg-blue-50 text-blue-700"
                   : "text-gray-600 hover:bg-gray-100"
               )}
