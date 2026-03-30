@@ -53,13 +53,19 @@ async function geocodeToComponents(query: string): Promise<AddressComponents | n
     status: string;
     results: Array<{
       formatted_address: string;
+      geometry: { location_type: string };
       address_components: Array<{ long_name: string; short_name: string; types: string[] }>;
     }>;
   };
 
   if (data.status !== "OK" || !data.results.length) return null;
 
-  const components = data.results[0].address_components;
+  // Only accept precise results — reject city/region-level matches that would pollute Billing_Street
+  const ACCEPTED_TYPES = ["ROOFTOP", "RANGE_INTERPOLATED"];
+  const best = data.results.find((r) => ACCEPTED_TYPES.includes(r.geometry.location_type));
+  if (!best) return null;
+
+  const components = best.address_components;
 
   const get = (type: string, short = false) =>
     components.find((c) => c.types.includes(type))?.[short ? "short_name" : "long_name"] ?? null;
