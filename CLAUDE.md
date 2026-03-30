@@ -42,6 +42,15 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - **End of session** — run `@review-2-code-commit` before pushing. This triggers the `opencode-review` GitHub Action on the PR automatically
 - CI passes → PR is squash-merged automatically and branch is deleted
 
+## Architecture Notes
+
+- Pin color semantics (Find Leads mode): pink (#ff0092) = new lead, purple (#9749c1) = selected/queued, teal (#00c2cc) = already in CRM. These are locked — do not change without updating all 3 files: `google-map.tsx`, `find-leads-panel.tsx`, `types/contacts.ts`
+- `BusinessType` union + `BUSINESS_TYPE_COLORS` in `types/contacts.ts` is the single source of truth for all business type lists. `filter-panel.tsx` derives its list from this constant — never hardcode a separate list
+- `/api/leads/discover` returns `contact_id` for existing CRM entries (select "id, place_id") — required for teal-pin click-to-open-ContactDetail behavior
+- `batch-add` API accepts `string | string[]` for `business_type` — backward compat intentional, do not narrow
+- Phase 2 (Contacts → Companies/Accounts migration) is blocked on Bigin prerequisites: bulk-assign Business_Type on Accounts, Billing_Street populated, decision on 278 `_unknown_company` records, Accounts single-select picklist behavior confirmed
+- Bigin Companies module API name is `Accounts` — not `Companies`. All scripts targeting company records must use `module=Accounts`
+
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
 - `npm run build` — Production build
