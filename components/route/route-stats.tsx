@@ -5,14 +5,22 @@ interface RouteStatsProps {
   stopCount: number;
   totalDistanceMeters?: number | null;
   totalDurationSeconds?: number | null;
+  entityLabel?: string;
 }
 
-export function RouteStats({ stopCount, totalDistanceMeters, totalDurationSeconds }: RouteStatsProps) {
+export function RouteStats({
+  stopCount,
+  totalDistanceMeters,
+  totalDurationSeconds,
+  entityLabel = "stop",
+}: RouteStatsProps) {
+  const pluralLabel = stopCount === 1 ? entityLabel : `${entityLabel}s`;
+
   return (
     <div className="flex items-center gap-4 text-sm text-gray-600">
       <span className="flex items-center gap-1">
         <MapPin className="h-3.5 w-3.5" />
-        {stopCount} {stopCount === 1 ? "stop" : "stops"}
+        {stopCount} {pluralLabel}
       </span>
       {totalDistanceMeters != null && totalDistanceMeters > 0 && (
         <span className="flex items-center gap-1">

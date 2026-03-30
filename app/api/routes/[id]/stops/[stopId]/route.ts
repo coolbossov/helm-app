@@ -16,6 +16,25 @@ const patchStopSchema = z.object({
 
 type Params = { params: Promise<{ id: string; stopId: string }> };
 
+async function resolveLinkedContactId(admin: ReturnType<typeof createAdminClient>, companyId: string) {
+  const { data: company } = await admin
+    .from("synced_companies")
+    .select("company_name")
+    .eq("id", companyId)
+    .single();
+
+  if (!company?.company_name) return null;
+
+  const { data: linkedContact } = await admin
+    .from("synced_contacts")
+    .select("id")
+    .eq("account_name", company.company_name)
+    .limit(1)
+    .maybeSingle();
+
+  return linkedContact?.id ?? null;
+}
+
 export async function PATCH(request: NextRequest, { params }: Params) {
   const { id, stopId } = await params;
   const supabase = await createClient();
@@ -63,16 +82,28 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   // Auto-log visit activity when stop is marked visited
-  if (parsed.data.status === "visited" && data?.contact_id) {
+  if (parsed.data.status === "visited") {
     const admin = createAdminClient();
-    await admin.from("contact_activities").insert({
-      contact_id: data.contact_id,
-      user_id: user.id,
-      activity_type: "visit",
-      title: "Visited",
-      content: parsed.data.visit_notes ?? null,
-      metadata: { route_id: id, stop_id: stopId },
-    });
+    let targetContactId: string | null = data?.contact_id ?? null;
+    const metadata: Record<string, unknown> = { route_id: id, stop_id: stopId };
+
+    if (!targetContactId && data?.company_id) {
+      targetContactId = await resolveLinkedContactId(admin, data.company_id);
+      if (targetContactId) {
+        metadata.company_id = data.company_id;
+      }
+    }
+
+    if (targetContactId) {
+      await admin.from("contact_activities").insert({
+        contact_id: targetContactId,
+        user_id: user.id,
+        activity_type: "visit",
+        title: "Visited",
+        content: parsed.data.visit_notes ?? null,
+        metadata,
+      });
+    }
   }
 
   return NextResponse.json({ data });

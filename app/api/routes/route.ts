@@ -5,8 +5,57 @@ import { createClient } from "@/lib/supabase/server";
 const createRouteSchema = z.object({
   name: z.string().min(1).max(100),
   planned_date: z.string().nullable().optional(),
-  stop_ids: z.array(z.string().uuid()).optional(), // contact IDs in order
+  stop_ids: z.array(z.string().uuid()).optional(), // company IDs in order
 });
+
+type CompanyRow = { id: string; company_name: string };
+type ContactRow = { id: string; account_name: string | null };
+
+async function resolveCompanyContext(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  stopIds: string[]
+) {
+  const { data: companies, error: companiesError } = await supabase
+    .from("synced_companies")
+    .select("id, company_name")
+    .in("id", stopIds);
+
+  if (companiesError) {
+    throw new Error(companiesError.message);
+  }
+
+  const companyRows = (companies ?? []) as CompanyRow[];
+  const companyMap = new Map(companyRows.map((c) => [c.id, c]));
+
+  const companyNames = [...new Set(companyRows.map((c) => c.company_name).filter(Boolean))];
+  let linkedContacts: ContactRow[] = [];
+
+  if (companyNames.length > 0) {
+    const { data: contacts, error: contactsError } = await supabase
+      .from("synced_contacts")
+      .select("id, account_name")
+      .in("account_name", companyNames);
+
+    if (contactsError) {
+      throw new Error(contactsError.message);
+    }
+
+    linkedContacts = (contacts ?? []) as ContactRow[];
+  }
+
+  const contactByAccount = new Map<string, string>();
+  for (const contact of linkedContacts) {
+    if (contact.account_name && !contactByAccount.has(contact.account_name)) {
+      contactByAccount.set(contact.account_name, contact.id);
+    }
+  }
+
+  return { companyMap, contactByAccount };
+}
+
+function isMissingCompanyColumnError(errorMessage: string) {
+  return /company_id|synced_companies|column .*company_id.* does not exist/i.test(errorMessage);
+}
 
 export async function GET() {
   const supabase = await createClient();
@@ -52,12 +101,86 @@ export async function POST(request: NextRequest) {
 
   // Insert stops if provided
   if (stop_ids && stop_ids.length > 0) {
-    const stops = stop_ids.map((contact_id, index) => ({
-      route_id: route.id,
-      contact_id,
-      stop_order: index,
-    }));
-    const { error: stopsError } = await supabase.from("route_stops").insert(stops);
+    const { companyMap, contactByAccount } = await resolveCompanyContext(supabase, stop_ids);
+
+    const orphanCompanyIds = stop_ids.filter((companyId) => !companyMap.has(companyId));
+    if (orphanCompanyIds.length > 0) {
+      return NextResponse.json(
+        { error: "One or more selected companies no longer exist in synced_companies" },
+        { status: 400 }
+      );
+    }
+
+    const companyStops = stop_ids.map((company_id, index) => {
+      const company = companyMap.get(company_id);
+      const contact_id = company ? contactByAccount.get(company.company_name) ?? null : null;
+
+      return {
+        route_id: route.id,
+        company_id,
+        contact_id,
+        stop_order: index,
+      };
+    });
+
+    let { error: stopsError } = await supabase.from("route_stops").insert(companyStops);
+
+    // Legacy fallback: older schema may not have company_id yet.
+    if (stopsError && isMissingCompanyColumnError(stopsError.message)) {
+      const legacyStops = stop_ids.map((companyId, index) => {
+        const company = companyMap.get(companyId);
+        const linkedContactId = company ? contactByAccount.get(company.company_name) : undefined;
+
+        return {
+          route_id: route.id,
+          contact_id: linkedContactId,
+          stop_order: index,
+        };
+      });
+
+      const missingLinks = legacyStops.filter((s) => !s.contact_id).length;
+      if (missingLinks > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Cannot create route on legacy schema: one or more companies have no linked contact. Apply migrations 015+017 to enable company-first route stops.",
+          },
+          { status: 400 }
+        );
+      }
+
+      ({ error: stopsError } = await supabase.from("route_stops").insert(
+        legacyStops.map((s) => ({
+          route_id: s.route_id,
+          contact_id: s.contact_id!,
+          stop_order: s.stop_order,
+        }))
+      ));
+    }
+
+    // Transitional fallback: company_id exists but contact_id is still NOT NULL.
+    if (stopsError && /null value in column "contact_id"/i.test(stopsError.message)) {
+      const patchedStops = companyStops.map((s) => {
+        if (s.contact_id) return s;
+        const company = companyMap.get(s.company_id);
+        const linkedContactId = company ? contactByAccount.get(company.company_name) : undefined;
+        return { ...s, contact_id: linkedContactId ?? null };
+      });
+
+      const stillMissing = patchedStops.filter((s) => !s.contact_id).length;
+      if (stillMissing > 0) {
+        return NextResponse.json(
+          {
+            error:
+              "Cannot create route until route_stops.contact_id is nullable (migration 017) or all companies have linked contacts.",
+          },
+          { status: 400 }
+        );
+      }
+
+      ({ error: stopsError } = await supabase.from("route_stops").insert(patchedStops));
+    }
+
     if (stopsError) return NextResponse.json({ error: stopsError.message }, { status: 500 });
   }
 

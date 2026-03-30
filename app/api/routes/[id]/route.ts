@@ -10,29 +10,56 @@ const patchSchema = z.object({
 
 type Params = { params: Promise<{ id: string }> };
 
+const CONTACT_SELECT = `
+  id, first_name, last_name, account_name,
+  mailing_street, mailing_city, mailing_state, mailing_zip,
+  latitude, longitude, business_type, priority, phone, mobile
+`;
+
+const COMPANY_SELECT = `
+  id, company_name,
+  billing_street, billing_city, billing_state, billing_zip,
+  latitude, longitude, business_type, priority, phone
+`;
+
 export async function GET(_request: NextRequest, { params }: Params) {
   const { id } = await params;
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const { data, error } = await supabase
-    .from("saved_routes")
-    .select(`
-      *,
-      route_stops (
+  const runQuery = async (includeCompanies: boolean) => {
+    const select = includeCompanies
+      ? `
         *,
-        synced_contacts (
-          id, first_name, last_name, account_name,
-          mailing_street, mailing_city, mailing_state, mailing_zip,
-          latitude, longitude, business_type, priority, phone, mobile
+        route_stops (
+          *,
+          synced_contacts (${CONTACT_SELECT}),
+          synced_companies:company_id (${COMPANY_SELECT})
         )
-      )
-    `)
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .order("stop_order", { referencedTable: "route_stops", ascending: true })
-    .single();
+      `
+      : `
+        *,
+        route_stops (
+          *,
+          synced_contacts (${CONTACT_SELECT})
+        )
+      `;
+
+    return supabase
+      .from("saved_routes")
+      .select(select)
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .order("stop_order", { referencedTable: "route_stops", ascending: true })
+      .single();
+  };
+
+  let { data, error } = await runQuery(true);
+
+  if (error && /company_id|synced_companies/i.test(error.message)) {
+    ({ data, error } = await runQuery(false));
+  }
 
   if (error) {
     return NextResponse.json(

@@ -12,6 +12,7 @@ type StopRow = {
   time_window_end: string | null;
   priority: string;
   synced_contacts: { id: string; latitude: number; longitude: number } | null;
+  synced_companies?: { id: string; latitude: number; longitude: number } | null;
 };
 
 export async function POST(request: NextRequest, { params }: Params) {
@@ -31,20 +32,38 @@ export async function POST(request: NextRequest, { params }: Params) {
     // No body or invalid JSON — use default mode
   }
 
-  // Fetch current stops with coordinates and time windows
-  const { data: route, error: fetchError } = await supabase
-    .from("saved_routes")
-    .select(`
-      id,
-      route_stops (
-        id, stop_order, time_window_start, time_window_end, priority,
-        synced_contacts (id, latitude, longitude)
-      )
-    `)
-    .eq("id", id)
-    .eq("user_id", user.id)
-    .order("stop_order", { referencedTable: "route_stops", ascending: true })
-    .single();
+  const runQuery = async (includeCompanies: boolean) => {
+    const select = includeCompanies
+      ? `
+        id,
+        route_stops (
+          id, stop_order, time_window_start, time_window_end, priority,
+          synced_contacts (id, latitude, longitude),
+          synced_companies:company_id (id, latitude, longitude)
+        )
+      `
+      : `
+        id,
+        route_stops (
+          id, stop_order, time_window_start, time_window_end, priority,
+          synced_contacts (id, latitude, longitude)
+        )
+      `;
+
+    return supabase
+      .from("saved_routes")
+      .select(select)
+      .eq("id", id)
+      .eq("user_id", user.id)
+      .order("stop_order", { referencedTable: "route_stops", ascending: true })
+      .single();
+  };
+
+  let { data: route, error: fetchError } = await runQuery(true);
+
+  if (fetchError && /company_id|synced_companies/i.test(fetchError.message)) {
+    ({ data: route, error: fetchError } = await runQuery(false));
+  }
 
   if (fetchError) {
     return NextResponse.json(
@@ -55,7 +74,11 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rawStops: StopRow[] = ((route as any).route_stops as StopRow[]).filter(
-    (s: StopRow) => s.synced_contacts?.latitude && s.synced_contacts?.longitude
+    (s: StopRow) => {
+      const lat = s.synced_companies?.latitude ?? s.synced_contacts?.latitude;
+      const lng = s.synced_companies?.longitude ?? s.synced_contacts?.longitude;
+      return lat != null && lng != null;
+    }
   );
 
   if (rawStops.length < 2) {
@@ -86,8 +109,8 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   const latLngs = rawStops.map((s) => ({
-    lat: s.synced_contacts!.latitude,
-    lng: s.synced_contacts!.longitude,
+    lat: (s.synced_companies?.latitude ?? s.synced_contacts?.latitude)!,
+    lng: (s.synced_companies?.longitude ?? s.synced_contacts?.longitude)!,
   }));
 
   const result = await optimizeStops(latLngs, mode);
