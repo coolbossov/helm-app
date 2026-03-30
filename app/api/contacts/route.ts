@@ -43,20 +43,25 @@ export async function GET(request: NextRequest) {
   // Filter by overdue: not visited in X days
   const overdueDays = searchParams.get("overdue_days");
   if (overdueDays) {
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - parseInt(overdueDays, 10));
-    query = query.or(
-      `last_visit_date.is.null,last_visit_date.lte.${cutoff.toISOString().split("T")[0]}`
-    );
+    const parsedDays = parseInt(overdueDays, 10);
+    if (!isNaN(parsedDays) && parsedDays > 0) {
+      const cutoff = new Date();
+      cutoff.setDate(cutoff.getDate() - parsedDays);
+      query = query.or(
+        `last_visit_date.is.null,last_visit_date.lte.${cutoff.toISOString().split("T")[0]}`
+      );
+    }
   }
 
   const search = searchParams.get("search");
   if (search) {
-    // Strip PostgREST filter syntax characters to prevent filter injection
-    const safeSearch = search.replace(/[(),]/g, "").slice(0, 100);
-    query = query.or(
-      `company_name.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`
-    );
+    // Strip PostgREST injection chars AND SQL ILIKE wildcards (% and _) to prevent full-table scans
+    const safeSearch = search.replace(/[(),%._ \\]/g, " ").trim().slice(0, 100);
+    if (safeSearch) {
+      query = query.or(
+        `company_name.ilike.%${safeSearch}%,phone.ilike.%${safeSearch}%`
+      );
+    }
   }
 
   // Only include geocoded contacts for map display
@@ -80,13 +85,16 @@ export async function GET(request: NextRequest) {
       .lte("longitude", parseFloat(east));
   }
 
-  query = query.order("company_name", { ascending: true }).limit(10000);
+  const HARD_LIMIT = 10000;
+  query = query.order("company_name", { ascending: true }).limit(HARD_LIMIT);
 
   const { data, error } = await query;
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  const truncated = (data ?? []).length >= HARD_LIMIT;
 
   const normalized = (data ?? []).map((row) => ({
     id: row.id,
@@ -105,7 +113,7 @@ export async function GET(request: NextRequest) {
   }));
 
   return NextResponse.json(
-    { data: normalized, count: normalized.length },
+    { data: normalized, count: normalized.length, truncated },
     {
       headers: {
         "Cache-Control": "private, max-age=60, stale-while-revalidate=300",

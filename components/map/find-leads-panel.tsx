@@ -89,7 +89,7 @@ export function FindLeadsPanel({
   const [routeError, setRouteError] = useState<string | null>(null);
   const [routeCreated, setRouteCreated] = useState(false);
   const [lastAddedCount, setLastAddedCount] = useState(0);
-  const [lastAddedContactIds, setLastAddedContactIds] = useState<string[]>([]);
+  const [lastAddedCompanyIds, setLastAddedCompanyIds] = useState<string[]>([]);
   const [localAddedIds, setLocalAddedIds] = useState<Set<string>>(new Set());
 
   const searchAreaRequestRef = useRef(0);
@@ -134,7 +134,7 @@ export function FindLeadsPanel({
     setRouteCreated(false);
     setRouteError(null);
     setLastAddedCount(0);
-    setLastAddedContactIds([]);
+    setLastAddedCompanyIds([]);
     onSelectedIdsChange(new Set());
 
     try {
@@ -249,12 +249,13 @@ export function FindLeadsPanel({
       onLeadsAdded();
 
       setLastAddedCount(added);
-      setLastAddedContactIds(createdIds);
+      setLastAddedCompanyIds(createdIds);
       setRouteName(defaultRouteName());
       setRouteError(null);
       setRouteCreated(false);
 
       setConfirmState(added > 0 && createdIds.length > 0 ? "route-prompt" : "idle");
+      // Note: createdIds are synced_companies.id UUIDs (not contact IDs)
     } catch (confirmError) {
       setError(confirmError instanceof Error ? confirmError.message : "Failed to add leads");
       setConfirmState("idle");
@@ -271,7 +272,7 @@ export function FindLeadsPanel({
   ]);
 
   const handleCreateRoute = useCallback(async () => {
-    if (lastAddedContactIds.length === 0 || isCreatingRoute) return;
+    if (lastAddedCompanyIds.length === 0 || isCreatingRoute) return;
 
     setIsCreatingRoute(true);
     setRouteError(null);
@@ -283,7 +284,7 @@ export function FindLeadsPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: routeName.trim() || defaultRouteName(),
-          stop_ids: lastAddedContactIds,
+          stop_ids: lastAddedCompanyIds,
         }),
       });
       const payload = await readResponsePayload(response);
@@ -300,7 +301,7 @@ export function FindLeadsPanel({
     } finally {
       setIsCreatingRoute(false);
     }
-  }, [isCreatingRoute, lastAddedContactIds, routeName]);
+  }, [isCreatingRoute, lastAddedCompanyIds, routeName]);
 
   return (
     <div className="flex h-full flex-col">

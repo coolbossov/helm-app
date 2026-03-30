@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -33,6 +33,13 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   const router = useRouter();
   const { route, loading, error, updateStopStatus, updateStopMeta, optimizeRoute } = useRoute(id);
   const [optimizing, setOptimizing] = useState(false);
+  const [optimizeError, setOptimizeError] = useState<string | null>(null);
+  const [isIOS, setIsIOS] = useState(false);
+
+  // Detect iOS for Apple Maps link (maps:// scheme is iOS-only)
+  useEffect(() => {
+    setIsIOS(/iPad|iPhone|iPod/.test(navigator.userAgent));
+  }, []);
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<OptimizationMode>("fastest");
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
@@ -40,8 +47,14 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   const handleOptimize = async (mode?: OptimizationMode) => {
     setOptimizing(true);
     setMenuOpen(false);
-    await optimizeRoute(mode ?? selectedMode);
-    setOptimizing(false);
+    setOptimizeError(null);
+    try {
+      await optimizeRoute(mode ?? selectedMode);
+    } catch (e) {
+      setOptimizeError(e instanceof Error ? e.message : "Optimization failed");
+    } finally {
+      setOptimizing(false);
+    }
   };
 
   if (loading) {
@@ -61,10 +74,12 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   }
 
   const stops = route.route_stops ?? [];
-  const companyCount = stops.filter((s) => s.synced_companies?.id != null || s.synced_contacts?.id != null).length;
-  const visitedCount = stops.filter((s) => s.status === "visited").length;
-  const skippedCount = stops.filter((s) => s.status === "skipped").length;
-  const allDone = stops.length > 0 && visitedCount + skippedCount === stops.length;
+  // Only count stops that have a linked entity — same predicate used when rendering
+  const linkedStops = stops.filter((s) => s.synced_companies || s.synced_contacts);
+  const companyCount = linkedStops.length;
+  const visitedCount = linkedStops.filter((s) => s.status === "visited").length;
+  const skippedCount = linkedStops.filter((s) => s.status === "skipped").length;
+  const allDone = linkedStops.length > 0 && visitedCount + skippedCount === linkedStops.length;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-6 pb-24">
@@ -118,19 +133,26 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
         </div>
       </div>
 
+      {/* Optimize error banner */}
+      {optimizeError && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {optimizeError}
+        </div>
+      )}
+
       {/* Progress bar */}
-      {stops.length > 0 && (
+      {linkedStops.length > 0 && (
         <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Progress</span>
             <span className="text-sm text-gray-500">
-              {visitedCount} / {stops.length} visited
+              {visitedCount} / {linkedStops.length} visited
             </span>
           </div>
           <div className="h-2 rounded-full bg-gray-100">
             <div
               className="h-2 rounded-full bg-green-500 transition-all"
-              style={{ width: `${(visitedCount / stops.length) * 100}%` }}
+              style={{ width: `${(visitedCount / linkedStops.length) * 100}%` }}
             />
           </div>
           {allDone && (
@@ -143,7 +165,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
       )}
 
       {/* Optimize button when no distance info */}
-      {!route.total_distance_meters && stops.length > 1 && (
+      {!route.total_distance_meters && linkedStops.length > 1 && (
         <Button
           variant="secondary"
           onClick={() => handleOptimize()}
@@ -156,7 +178,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
       )}
 
       {/* Summary stats */}
-      {stops.length > 0 && (
+      {linkedStops.length > 0 && (
         <div className="mb-4 grid grid-cols-3 gap-2">
           <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
             <p className="text-lg font-bold text-green-600">{visitedCount}</p>
@@ -168,7 +190,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
           </div>
           <div className="rounded-lg border border-gray-200 bg-white p-3 text-center">
             <p className="text-lg font-bold text-blue-600">
-              {stops.filter((s) => s.status === "pending").length}
+              {linkedStops.filter((s) => s.status === "pending").length}
             </p>
             <p className="text-xs text-gray-500">Remaining</p>
           </div>
@@ -176,15 +198,14 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
       )}
 
       {/* Stops */}
-      {stops.length === 0 ? (
+      {linkedStops.length === 0 ? (
         <p className="text-center text-sm text-gray-500 py-10">No stops in this route</p>
       ) : (
         <div className="space-y-3">
-          {stops.map((stop, index) => {
+          {linkedStops.map((stop, index) => {
             const company = stop.synced_companies;
             const contact = stop.synced_contacts;
-            if (!company && !contact) return null;
-
+            // linkedStops filter guarantees at least one is present
             const name = company?.company_name ?? getDisplayName(contact!);
             const address = formatAddress(
               company?.billing_street ?? contact?.mailing_street ?? null,
@@ -197,7 +218,8 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
             const lng = company?.longitude ?? contact?.longitude;
             const encodedAddr = address ? encodeURIComponent(address) : "";
             const googleUrl = address ? `https://www.google.com/maps/dir/?api=1&destination=${encodedAddr}` : null;
-            const appleUrl = lat != null && lng != null ? `maps://maps.apple.com/?daddr=${lat},${lng}` : null;
+            // Apple Maps deep-link only works on iOS — suppress on Android/desktop
+            const appleUrl = isIOS && lat != null && lng != null ? `maps://maps.apple.com/?daddr=${lat},${lng}` : null;
             const wazeUrl = lat != null && lng != null ? `https://waze.com/ul?ll=${lat},${lng}&navigate=yes` : null;
 
             const isExpanded = expandedStop === stop.id;

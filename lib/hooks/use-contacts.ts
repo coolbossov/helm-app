@@ -8,16 +8,19 @@ export function useContacts() {
   const [markers, setMarkers] = useState<ContactMarkerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [truncated, setTruncated] = useState(false);
 
   const fetchMarkers = useCallback(async () => {
     setLoading(true);
     setError(null);
+    setTruncated(false);
     try {
       const res = await fetch("/api/contacts?map=true");
       if (!res.ok) throw new Error("Failed to fetch contacts");
       const json = await res.json();
       const data: ContactMarkerData[] = json.data ?? [];
       setMarkers(data);
+      setTruncated(json.truncated === true);
       // Cache for offline use
       cacheSet("contacts", data).catch(() => {/* ignore */});
     } catch (err) {
@@ -37,7 +40,7 @@ export function useContacts() {
     fetchMarkers();
   }, [fetchMarkers]);
 
-  return { markers, loading, error, refetch: fetchMarkers };
+  return { markers, loading, error, truncated, refetch: fetchMarkers };
 }
 
 export function useContactDetail(id: string | null) {

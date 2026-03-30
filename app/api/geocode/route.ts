@@ -8,6 +8,11 @@ const schema = z.object({
 });
 
 export async function POST(request: NextRequest) {
+  // Auth check must come first — before parsing body — to prevent unauthenticated API key usage
+  const supabase = await createClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const target = request.nextUrl.searchParams.get("target") === "companies"
     ? "companies"
     : "contacts";
@@ -20,12 +25,6 @@ export async function POST(request: NextRequest) {
   }
 
   if (!body || (typeof body === "object" && body !== null && !("address" in body))) {
-    const supabase = await createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
     try {
       const geocoded = target === "companies"
         ? await batchGeocodeCompanies()

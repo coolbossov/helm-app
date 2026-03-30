@@ -72,7 +72,11 @@ export function useRoutes() {
   }, [fetchRoutes]);
 
   const deleteRoute = useCallback(async (id: string) => {
-    await fetch(`/api/routes/${id}`, { method: "DELETE" });
+    const res = await fetch(`/api/routes/${id}`, { method: "DELETE" });
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error((json as { error?: string }).error || "Failed to delete route");
+    }
     setRoutes((prev) => prev.filter((r) => r.id !== id));
   }, []);
 
@@ -107,8 +111,10 @@ export function useRoute(id: string | null) {
   ) => {
     if (!id) return;
 
-    // Optimistic update
+    // Snapshot for rollback
+    let snapshot: RouteWithStops | null = null;
     setRoute((prev) => {
+      snapshot = prev;
       if (!prev) return prev;
       return {
         ...prev,
@@ -126,9 +132,19 @@ export function useRoute(id: string | null) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status }),
       });
-      if (!res.ok) throw new Error("Server error");
-    } catch {
-      await enqueueOfflineMutation("PATCH", `/api/routes/${id}/stops/${stopId}`, { status });
+      if (!res.ok) {
+        // Online but server error — rollback optimistic update
+        setRoute(snapshot);
+        throw new Error("Server error");
+      }
+    } catch (err) {
+      // Network offline — queue for later and keep optimistic state
+      if (err instanceof TypeError) {
+        await enqueueOfflineMutation("PATCH", `/api/routes/${id}/stops/${stopId}`, { status });
+      } else {
+        // Server returned an error — state already rolled back above
+        setRoute(snapshot);
+      }
     }
   }, [id]);
 
@@ -173,8 +189,11 @@ export function useRoute(id: string | null) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ mode }),
     });
-    if (res.ok) await fetchRoute();
-    return res.ok;
+    if (!res.ok) {
+      const json = await res.json().catch(() => ({}));
+      throw new Error((json as { error?: string }).error || "Optimization failed");
+    }
+    await fetchRoute();
   }, [id, fetchRoute]);
 
   return { route, loading, error, updateStopStatus, updateStopMeta, optimizeRoute, refresh: fetchRoute };

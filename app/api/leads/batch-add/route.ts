@@ -6,13 +6,15 @@ import { createAdminClient } from "@/lib/supabase/admin";
 const schema = z.object({
   leads: z.array(
     z.object({
-      place_id: z.string().min(1),
+      // Google Place IDs are alphanumeric+underscores, max ~200 chars — enforce allowlist
+      place_id: z.string().min(1).max(200).regex(/^[A-Za-z0-9_-]+$/, "Invalid place_id format"),
       name: z.string().trim().min(1).max(200),
       address: z.string().max(500).default(""),
       lat: z.number(),
       lng: z.number(),
       phone: z.string().max(50).nullable().default(null),
-      website: z.string().url().max(500).nullable().default(null),
+      // Only allow http/https URLs — rejects javascript:, file:, data: etc.
+      website: z.string().url().max(500).startsWith("http").nullable().default(null),
     })
   ).min(1).max(100),
   // Accepts either a single string (new) or array (legacy) for backward compat

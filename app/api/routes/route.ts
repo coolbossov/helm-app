@@ -31,10 +31,15 @@ async function resolveCompanyContext(
   let linkedContacts: ContactRow[] = [];
 
   if (companyNames.length > 0) {
+    // Use case-insensitive match — Bigin sync may produce name casing differences
+    // Build OR filter: account_name.ilike.Name1,account_name.ilike.Name2,...
+    const ilikeFilter = companyNames
+      .map((n) => `account_name.ilike.${n}`)
+      .join(",");
     const { data: contacts, error: contactsError } = await supabase
       .from("synced_contacts")
       .select("id, account_name")
-      .in("account_name", companyNames);
+      .or(ilikeFilter);
 
     if (contactsError) {
       throw new Error(contactsError.message);
@@ -77,7 +82,9 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ data });
+  return NextResponse.json({ data }, {
+    headers: { "Cache-Control": "private, max-age=10, stale-while-revalidate=60" },
+  });
 }
 
 export async function POST(request: NextRequest) {

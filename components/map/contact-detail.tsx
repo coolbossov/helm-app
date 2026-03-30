@@ -310,23 +310,27 @@ export const ContactDetail = memo(function ContactDetail({ contactId, onClose }:
               </a>
             </div>
           )}
-          {contact.website && (
-            <div className="flex items-center gap-2 text-sm">
-              <Globe className="h-4 w-4 text-gray-400" />
-              <a
-                href={
-                  contact.website.startsWith("http")
-                    ? contact.website
-                    : `https://${contact.website}`
-                }
-                target="_blank"
-                rel="noopener noreferrer"
-                className="truncate text-blue-600 hover:underline"
-              >
-                {contact.website}
-              </a>
-            </div>
-          )}
+          {contact.website && (() => {
+            // Only render links for http/https URLs — reject javascript:, file:, data: etc.
+            const safeUrl = /^https?:\/\//i.test(contact.website)
+              ? contact.website
+              : /^[a-zA-Z0-9-]+\.[a-zA-Z]{2,}/i.test(contact.website)
+                ? `https://${contact.website}`
+                : null;
+            return safeUrl ? (
+              <div className="flex items-center gap-2 text-sm">
+                <Globe className="h-4 w-4 text-gray-400" />
+                <a
+                  href={safeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="truncate text-blue-600 hover:underline"
+                >
+                  {contact.website}
+                </a>
+              </div>
+            ) : null;
+          })()}
         </div>
 
         {/* Notes */}

@@ -160,7 +160,7 @@ export function DrivingStop({
           {onToggleExpand && (
             <button
               onClick={onToggleExpand}
-              className="rounded-lg p-2 text-gray-400 hover:bg-gray-100"
+              className="rounded-lg p-2.5 text-gray-400 hover:bg-gray-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
             >
               <ChevronDown className={cn("h-4 w-4 transition-transform", expanded && "rotate-180")} />
             </button>
@@ -168,11 +168,12 @@ export function DrivingStop({
         </div>
       </div>
 
+      {/* Min height 44px for touch targets (WCAG 2.5.5) */}
       <div className="mt-3 flex gap-2">
         <button
           onClick={() => onStatusChange("visited")}
           className={cn(
-            "flex-1 rounded-lg py-1.5 text-sm font-medium transition-colors",
+            "flex-1 rounded-lg py-3 text-sm font-medium transition-colors",
             status === "visited"
               ? "bg-green-600 text-white"
               : "border border-green-300 text-green-700 hover:bg-green-50"
@@ -183,7 +184,7 @@ export function DrivingStop({
         <button
           onClick={() => onStatusChange("skipped")}
           className={cn(
-            "flex-1 rounded-lg py-1.5 text-sm font-medium transition-colors",
+            "flex-1 rounded-lg py-3 text-sm font-medium transition-colors",
             status === "skipped"
               ? "bg-gray-400 text-white"
               : "border border-gray-300 text-gray-600 hover:bg-gray-50"
@@ -194,7 +195,7 @@ export function DrivingStop({
         {status !== "pending" && (
           <button
             onClick={() => onStatusChange("pending")}
-            className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+            className="rounded-lg border border-gray-300 px-3 py-3 text-sm text-gray-600 hover:bg-gray-50"
           >
             Reset
           </button>
