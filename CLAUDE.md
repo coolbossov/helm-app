@@ -50,6 +50,11 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - `batch-add` API accepts `string | string[]` for `business_type` — backward compat intentional, do not narrow
 - Phase 2 (Contacts → Companies/Accounts migration) is blocked on Bigin prerequisites: bulk-assign Business_Type on Accounts, Billing_Street populated, decision on 278 `_unknown_company` records, Accounts single-select picklist behavior confirmed
 - Bigin Companies module API name is `Accounts` — not `Companies`. All scripts targeting company records must use `module=Accounts`
+- HELM is a single-user app (one admin account via Supabase Auth) — security review findings about "any authenticated user accessing global data" are false positives. All routes use the same admin client pattern by design. Do not add per-user RLS or ownership checks.
+- Supabase dynamic select typing: `.select()` with a runtime string variable loses TypeScript inference and returns `GenericStringError`. Use `.returns<Array<Record<string, unknown>>>()` to cast the result type explicitly.
+- CI squash-merge timing: commits pushed after CI begins merging may not be included in the squash. Always verify the merge SHA includes all intended commits before closing a PR.
+- Push sync uses preview-then-confirm pattern: `GET /api/sync/push/preview` (read-only) → user confirms → `POST /api/sync/push`. Never skip the preview step.
+- Pull sync returns field-level diff: `SyncResult` includes `created`/`updated`/`unchanged` counts + `details[]` array with per-contact `fieldsChanged[]`. Diff is computed on-the-fly — no DB table, no migration needed.
 
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
