@@ -107,10 +107,11 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     if (!targetContactId && data?.company_id) {
       const linkedResolution = await resolveLinkedContactId(admin, data.company_id);
       targetContactId = linkedResolution.contactId;
-      if (linkedResolution.reason === "ambiguous") {
+
+      if (linkedResolution.reason !== "resolved") {
         visitActivityMeta = {
           status: "skipped",
-          reason: "ambiguous_company_contact",
+          reason: linkedResolution.reason,
           company_id: data.company_id,
         };
       }
