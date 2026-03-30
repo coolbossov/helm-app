@@ -1,8 +1,17 @@
 export { getAccessToken } from "./token";
-export { fetchAllContacts, updateContact } from "./client";
+export {
+  fetchAllContacts,
+  fetchContactsSince,
+  fetchAllAccounts,
+  fetchAccountsSince,
+  updateContact,
+  updateAccount,
+} from "./client";
 export { syncAllContacts, getFullAddress } from "./contacts";
+export { syncCompanies } from "./companies";
 export {
   mapBusinessTypes,
+  mapBusinessType,
   mapLifecycleStage,
   mapPriority,
   mapContactingStatus,

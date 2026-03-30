@@ -1,5 +1,5 @@
 import { getAccessToken } from "./token";
-import type { ZohoListResponse, ZohoContact } from "@/types";
+import type { ZohoListResponse, ZohoContact, ZohoAccount } from "@/types";
 
 const BIGIN_API_BASE = "https://www.zohoapis.com/bigin/v2";
 
@@ -24,6 +24,19 @@ const CONTACT_FIELDS = [
   "Contacting_Tips",
   "Prospecting_Initial_notes",
   "Created_Time",
+  "Modified_Time",
+].join(",");
+
+const ACCOUNT_FIELDS = [
+  "Account_Name",
+  "Phone",
+  "Website",
+  "Business_Type",
+  "Billing_Street",
+  "Billing_City",
+  "Billing_State",
+  "Billing_Code",
+  "Google_Maps",
   "Modified_Time",
 ].join(",");
 
@@ -72,6 +85,31 @@ export async function fetchAllContacts(): Promise<ZohoContact[]> {
   return allContacts;
 }
 
+export async function fetchAllAccounts(): Promise<ZohoAccount[]> {
+  const allAccounts: ZohoAccount[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const response = await zohoFetch<ZohoListResponse<ZohoAccount>>(
+      `/Accounts?fields=${ACCOUNT_FIELDS}&page=${page}&per_page=200`
+    );
+
+    if (response.data) {
+      allAccounts.push(...response.data);
+    }
+
+    hasMore = response.info?.more_records ?? false;
+    page++;
+
+    if (hasMore) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+
+  return allAccounts;
+}
+
 export async function fetchContactsSince(
   modifiedTime: string
 ): Promise<ZohoContact[]> {
@@ -99,11 +137,48 @@ export async function fetchContactsSince(
   return allContacts;
 }
 
+export async function fetchAccountsSince(
+  modifiedTime: string
+): Promise<ZohoAccount[]> {
+  const allAccounts: ZohoAccount[] = [];
+  let page = 1;
+  let hasMore = true;
+
+  while (hasMore) {
+    const response = await zohoFetch<ZohoListResponse<ZohoAccount>>(
+      `/Accounts?fields=${ACCOUNT_FIELDS}&page=${page}&per_page=200&modified_since=${modifiedTime}`
+    );
+
+    if (response.data) {
+      allAccounts.push(...response.data);
+    }
+
+    hasMore = response.info?.more_records ?? false;
+    page++;
+
+    if (hasMore) {
+      await new Promise((r) => setTimeout(r, 200));
+    }
+  }
+
+  return allAccounts;
+}
+
 export async function updateContact(
   zohoId: string,
   data: Record<string, unknown>
 ): Promise<void> {
   await zohoFetch(`/Contacts/${zohoId}`, {
+    method: "PUT",
+    body: JSON.stringify({ data: [data] }),
+  });
+}
+
+export async function updateAccount(
+  zohoAccountId: string,
+  data: Record<string, unknown>
+): Promise<void> {
+  await zohoFetch(`/Accounts/${zohoAccountId}`, {
     method: "PUT",
     body: JSON.stringify({ data: [data] }),
   });

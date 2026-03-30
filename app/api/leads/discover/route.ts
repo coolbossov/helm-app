@@ -39,9 +39,9 @@ export interface DiscoveryResult {
   phone: string | null;
   website: string | null;
   types: string[];
-  // true if already in synced_contacts
+  // true if already in synced_companies
   already_in_crm: boolean;
-  // internal contact id when already_in_crm is true; null for new leads
+  // internal company id in contact_id for compatibility
   contact_id: string | null;
 }
 
@@ -227,7 +227,7 @@ export async function POST(request: NextRequest) {
   const placeIds = allResults.map((p) => p.id).filter(Boolean);
 
   const { data: existing } = await supabase
-    .from("synced_contacts")
+    .from("synced_companies")
     .select("id, place_id")
     .in("place_id", placeIds);
 

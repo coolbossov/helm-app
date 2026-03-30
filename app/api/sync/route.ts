@@ -2,7 +2,8 @@ import { NextResponse } from "next/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { createClient } from "@/lib/supabase/server";
 import { syncAllContacts } from "@/lib/zoho/contacts";
-import { batchGeocodeContacts } from "@/lib/google/geocoder";
+import { syncCompanies } from "@/lib/zoho/companies";
+import { batchGeocodeContacts, batchGeocodeCompanies } from "@/lib/google/geocoder";
 import { rateLimit } from "@/lib/utils/rate-limit";
 
 export async function POST() {
@@ -32,11 +33,13 @@ export async function POST() {
     .single();
 
   try {
-    // Step 1: Sync contacts from Zoho
+    // Step 1: Sync contacts and companies from Zoho
     const syncResult = await syncAllContacts();
+    const companySyncResult = await syncCompanies();
 
-    // Step 2: Geocode new contacts
+    // Step 2: Geocode new records
     const geocoded = await batchGeocodeContacts();
+    const companiesGeocoded = await batchGeocodeCompanies();
 
     // Update sync log
     await supabase
@@ -58,7 +61,13 @@ export async function POST() {
       contacts_updated: syncResult.updated,
       contacts_unchanged: syncResult.unchanged,
       contacts_geocoded: geocoded,
+      companies_synced: companySyncResult.synced,
+      companies_created: companySyncResult.created,
+      companies_updated: companySyncResult.updated,
+      companies_unchanged: companySyncResult.unchanged,
+      companies_geocoded: companiesGeocoded,
       details: syncResult.details,
+      company_details: companySyncResult.details,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unknown error";

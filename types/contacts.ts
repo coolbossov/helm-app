@@ -99,6 +99,34 @@ export interface SyncedContact {
   updated_at: string;
 }
 
+export interface SyncedCompany {
+  id: string;
+  zoho_account_id: string;
+  company_name: string;
+  phone: string | null;
+  website: string | null;
+  business_type: string | null;
+  billing_street: string | null;
+  billing_city: string | null;
+  billing_state: string | null;
+  billing_zip: string | null;
+  latitude: number | null;
+  longitude: number | null;
+  geocode_status: GeocodeStatus;
+  place_id: string | null;
+  priority: Priority | null;
+  lifecycle_stage: LifecycleStage | null;
+  contacting_status: ContactingStatus | null;
+  visit_status: VisitStatus | null;
+  last_visit_date: string | null;
+  contacting_tips: string | null;
+  prospecting_notes: string | null;
+  zoho_modified_time: string | null;
+  last_synced_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ContactMarkerData {
   id: string;
   zoho_id: string;
@@ -113,6 +141,8 @@ export interface ContactMarkerData {
   visit_status: VisitStatus | null;
   last_visit_date: string | null;
 }
+
+export type CompanyMarkerData = ContactMarkerData;
 
 export interface ContactFilters {
   business_types: string[];

@@ -7,10 +7,16 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { data, error } = await supabase
-    .from("latest_contact_visits")
-    .select("contact_id, last_visited_at");
+    .from("synced_companies")
+    .select("id, last_visit_date")
+    .not("last_visit_date", "is", null);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ data: data ?? [] });
+  const normalized = (data ?? []).map((row) => ({
+    contact_id: row.id,
+    last_visited_at: row.last_visit_date,
+  }));
+
+  return NextResponse.json({ data: normalized });
 }

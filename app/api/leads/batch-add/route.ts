@@ -55,13 +55,13 @@ export async function POST(request: NextRequest) {
 
   const admin = createAdminClient();
   const { leads } = parsed.data;
-  // Normalize business_type to string[] for the DB column
+  // Normalize business_type to a single string for synced_companies
   const rawType = parsed.data.business_type;
-  const business_type: string[] = Array.isArray(rawType)
-    ? rawType
+  const business_type: string | null = Array.isArray(rawType)
+    ? (rawType[0] ?? null)
     : rawType
-      ? [rawType]
-      : [];
+      ? rawType
+      : null;
 
   let added = 0;
   let skipped = 0;
@@ -73,23 +73,18 @@ export async function POST(request: NextRequest) {
     const chunk = leads.slice(i, i + chunkSize);
     const rows = chunk.map((lead) => {
       const normalizedName = lead.name.trim();
-      const nameParts = normalizedName.split(/\s+/);
-      const lastName = nameParts.length > 1 ? nameParts.slice(1).join(" ") : nameParts[0];
-      const firstName = nameParts.length > 1 ? nameParts[0] : null;
 
       return {
-        zoho_id: `place_${lead.place_id}`,
+        zoho_account_id: `place_${lead.place_id}`,
         place_id: lead.place_id,
-        last_name: lastName,
-        first_name: firstName,
-        account_name: normalizedName,
-        mailing_street: lead.address,
+        company_name: normalizedName,
+        billing_street: lead.address,
         phone: lead.phone ?? null,
         website: lead.website ?? null,
         latitude: lead.lat,
         longitude: lead.lng,
         geocode_status: "success",
-        business_type: business_type.length > 0 ? business_type : [],
+        business_type,
         lifecycle_stage: "Lead",
         visit_status: "Never Visited",
         last_synced_at: new Date().toISOString(),
@@ -97,13 +92,13 @@ export async function POST(request: NextRequest) {
     });
 
     const { data: upserted, error: upsertError } = await admin
-      .from("synced_contacts")
+      .from("synced_companies")
       .upsert(
         rows,
         { onConflict: "place_id", ignoreDuplicates: true }
       )
       .select(
-        "id, zoho_id, last_name, account_name, latitude, longitude, business_type, priority, lifecycle_stage, contacting_status, visit_status"
+        "id, zoho_account_id, company_name, latitude, longitude, business_type, priority, lifecycle_stage, contacting_status, visit_status"
       );
 
     if (upsertError) {
@@ -111,7 +106,19 @@ export async function POST(request: NextRequest) {
       continue;
     }
 
-    const inserted = (upserted ?? []) as CreatedContact[];
+    const inserted = (upserted ?? []).map((row) => ({
+      id: row.id,
+      zoho_id: row.zoho_account_id,
+      last_name: row.company_name,
+      account_name: row.company_name,
+      latitude: row.latitude,
+      longitude: row.longitude,
+      business_type: row.business_type ? [row.business_type] : [],
+      priority: row.priority,
+      lifecycle_stage: row.lifecycle_stage,
+      contacting_status: row.contacting_status,
+      visit_status: row.visit_status,
+    })) as CreatedContact[];
     contacts.push(...inserted);
     added += inserted.length;
     skipped += chunk.length - inserted.length;
