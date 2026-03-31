@@ -87,6 +87,15 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Contacts API has a `HARD_LIMIT` constant — response includes `truncated: boolean` when results are capped. `overdue_days` NaN guard added; search wildcard sanitization applied.
 - Auth check in `app/api/geocode/route.ts` is before body parse — do not reorder.
 
+- `CompanyMarkerData` is the canonical marker type (renamed from `ContactMarkerData` — alias removed). `ContactMarkerData` no longer exists anywhere in the codebase. Do not re-introduce it.
+- `useCompanies()` is the hook name (file remains `lib/hooks/use-contacts.ts` — filename unchanged, only function renamed). Do not rename the file.
+- `BuilderStop.company` is the field name (was `BuilderStop.contact`). `BuilderStop.contactId` params renamed to `companyId`. Do not revert.
+- `updateStopStatus` returns a typed result: `{ visit_activity: { status, reason?, company_id? } } | { __error: true } | null | void`. The `__error: true` sentinel is intentional — callers check this instead of catching. Do not re-throw.
+- `GET /api/visit-log` — returns last 50 visit activities with company name resolution, auth-gated. Lazy-loaded in Settings page (not auto-fetched on mount).
+- Migration 020 applied to production: `field_updates.contact_id` is now nullable + CHECK constraint requires at least one of `contact_id` or `company_id`. Company field edits now correctly queue for CRM push.
+- Auto-scroll after stop status change: after marking visited or skipped, smooth-scrolls to next pending stop; if none remain, scrolls to progress bar. Files: `app/(app)/routes/[id]/page.tsx`, `components/route/stop-list.tsx`.
+- `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` removed from `.env.local.example` — still present in Vercel project settings (manual delete required — Vercel MCP has no env var delete endpoint).
+
 ## Commands
 - `npm run dev` — Start dev server with Turbopack
 - `npm run build` — Production build

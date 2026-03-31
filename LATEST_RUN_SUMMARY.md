@@ -1,50 +1,70 @@
 # helm-app — Latest Run Summary
 
-**Date:** 2026-03-30  
-**Session:** 48h Comprehensive Review — Post-PR Cleanup  
-**Branch at close:** `main` @ `35e761e`
+**Date:** 2026-03-31  
+**Session:** Unified Polish & Cleanup — Migration 020, Auto-scroll, Visit Log, Naming Cleanup (PR #37)  
+**Branch at close:** `main` (PR #37 merged @ 2026-03-31T19:33:04Z)
 
 ---
 
 ## Current State
 
-- `main` is fully clean — no open PRs, no pending branches
-- **Supabase production:** migrations 001–019 all applied ✅
-- **Vercel production:** deploy `dpl_WJtVPVVFDTUGo9nvpsX53kjt5eGN` — READY, 0 runtime errors
-- **CLAUDE.md:** 13 architecture notes committed to main (`919582f`)
+- `main` is fully clean — PR #37 merged, no open PRs, no pending branches
+- **Supabase production:** migrations 001–020 all applied ✅
+- **Migration 020:** `field_updates.contact_id` nullable + CHECK constraint (at least one of `contact_id` or `company_id`) — company field edits now correctly queue for CRM push
+- **Vercel production:** auto-deployed from main post-merge — READY ✅
+- **CLAUDE.md:** +8 architecture notes committed to main (this session)
+- **⚠️ Manual action outstanding:** Remove `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` from Vercel project settings dashboard (Vercel MCP has no env var delete endpoint — takes 10 seconds manually)
 
 ---
 
 ## What Was Done This Session
 
-PR #34 (`fix/review-48h-fixes`) merged — 31 fixes across 25 files:
+PR #37 (`feat/unified-polish-cleanup`) merged — 4 phases across ~20 files:
 
-**Security:** auth check before body parse in `/api/geocode`; XSS URL allowlist (Zod + `new URL()`); `bulk_update_stop_order` RPC with `SET search_path = public`; `place_id` length cap + regex; `metadata` POST 50-key/1KB cap.
+**Phase 1 — Migration 020 (BLOCKING fix):**
+Applied `020_field_updates_nullable_contact.sql` to Supabase production. Drops NOT NULL on `field_updates.contact_id`, adds CHECK constraint requiring at least one of `contact_id` or `company_id`. Was silently causing all company field edits to fail to queue for CRM push.
 
-**Bugs:** `handleOptimize` try/finally (spinner never freezes); `deleteRoute` checks `res.ok`; `updateStopStatus` snapshot-rollback; `companyCount` unified on `linkedStops`; `strict_time_windows` clears stale data; `overdue_days` NaN guard; PostgREST ILIKE comma quoting + wildcard sanitization; website URL dual-layer safety.
+**Phase 2 — Auto-scroll to next pending stop:**
+After marking a stop visited or skipped, smooth-scrolls to next pending stop. If no pending stops remain, scrolls to progress bar. Files: `app/(app)/routes/[id]/page.tsx`, `components/route/stop-list.tsx`.
 
-**Performance:** N sequential UPDATEs → `bulk_update_stop_order` RPC (migration 018); GIN trigram + performance indexes (migration 019); Cache-Control headers; contacts 10k hard limit + truncation flag.
+**Phase 2b — Visit resolution feedback + Visit Log:**
+- Toast notification when visit CRM activity log fails (ambiguous resolution, error)
+- `updateStopStatus` now returns typed meta: `{ visit_activity: { status, reason?, company_id? } } | { __error: true } | null | void`
+- New `GET /api/visit-log` endpoint — last 50 visit activities with company name resolution, auth-gated
+- Visit Log card in Settings page — lazy-load, scrollable list with timestamps
+- Files: `lib/hooks/use-routes.ts`, `app/(app)/routes/[id]/page.tsx`, `app/api/visit-log/route.ts`, `app/(app)/settings/page.tsx`
 
-**Mobile/UX:** `h-[100dvh]` iOS Safari fix; pinch-to-zoom re-enabled (WCAG); PWA manifest; touch targets ≥44px; Apple Maps iOS-only; mobile nav `text-xs`.
+**Phase 3 — Naming cleanup (contact → company):**
+- `ContactMarkerData` → `CompanyMarkerData` (type rename, alias removed)
+- `useContacts` → `useCompanies` (hook rename, file kept as `use-contacts.ts`)
+- `BuilderStop.contact` → `BuilderStop.company`, `contactId` params → `companyId`
+- Coverage API response field `contact_id` → `company_id`
+- ~20 files changed, all mechanical renames, TypeScript compiler verified, build passes
 
-**New files:** `lib/hooks/use-mobile.ts`, `public/manifest.json`, `supabase/migrations/018_bulk_update_stop_order.sql`, `supabase/migrations/019_search_indexes.sql`
+**Phase 4 — Cleanup:**
+- Removed `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` from `.env.local.example` (unused in code)
+- Deleted stale local branches: `fix/review-48h-fixes`, `fix/stabilization-unified`, `test/codex-check`, `feat/find-leads-route-assignment`
 
-Post-PR cleanup: migrations 018+019 applied to production; CLAUDE.md +13 lines committed; changelogs created.
+**Code review:** OpenAI `@review-2-code-commit` run — 1 false positive confirmed (ImportResult.contact vs BuilderStop.company are different types). 3 real findings fixed before PR: error sentinel pattern, synced_contacts array cast, await on skipped path.
 
 ---
 
 ## Key Architecture Facts (for next session)
 
-- `useIsMobile()` at `lib/hooks/use-mobile.ts` — SSR-safe, exported from `lib/hooks/index.ts`
-- `bulk_update_stop_order(stop_orders jsonb)` RPC — use for all stop reordering (migration 018)
-- All `SECURITY DEFINER` functions require `SET search_path = public`
-- `h-[100dvh]` in `app/(app)/layout.tsx` — do not revert
-- `maximumScale: 5, userScalable: true` — do not revert (WCAG)
-- Auth check in `app/api/geocode/route.ts` is before `request.json()` — do not reorder
-- Migrations 001–019 all applied to production
+- `CompanyMarkerData` is the canonical marker type — `ContactMarkerData` is gone, do not re-introduce
+- `useCompanies()` hook in `lib/hooks/use-contacts.ts` (filename unchanged)
+- `BuilderStop.company` field (was `.contact`), `companyId` params (were `contactId`)
+- `updateStopStatus` returns `{ visit_activity: ... } | { __error: true } | null | void` — check `__error` sentinel, do not re-throw
+- `GET /api/visit-log` — auth-gated, last 50 activities, lazy-loaded in Settings
+- Migration 020 applied — `field_updates.contact_id` nullable, CHECK constraint active
+- Migrations 001–020 all applied to production
 - Supabase project ID: `lufdqoilfgjjuohteyrs` (listed as "Booksa" in dashboard — ignore the name)
 - Supabase MCP tool points to wrong project — use Management API directly for helm-app Supabase ops
 - Next.js 16: use `eslint .` via `@eslint/eslintrc` flat compat (not `next lint`)
+- `useIsMobile()` at `lib/hooks/use-mobile.ts` — SSR-safe
+- `bulk_update_stop_order(stop_orders jsonb)` RPC — use for all stop reordering (migration 018)
+- `h-[100dvh]` in `app/(app)/layout.tsx` — do not revert
+- `maximumScale: 5, userScalable: true` — do not revert (WCAG)
 
 ---
 
@@ -52,17 +72,18 @@ Post-PR cleanup: migrations 018+019 applied to production; CLAUDE.md +13 lines c
 
 | Item | Priority |
 |------|----------|
-| Auto-scroll to next pending stop after marking visited | P1 (driving safety) |
+| Remove `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` from Vercel project settings | P1 (manual, 10 sec) |
 | Routes filtering (status/date/territory) | P2 |
-| Offline replay conflict resolution (last-write-wins silent) | P2 |
-| IDB-cache race condition (concurrent `openDB()` calls) | P2 |
 | Test scaffold (vitest + testing-library) | P3 |
-| Remove `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` from Vercel env vars | P3 (dead config) |
+| Google My Maps Sync (optional, Plan 1) | P4 |
+| Offline replay conflict resolution (last-write-wins silent) | P4 |
+| IDB-cache race condition (concurrent `openDB()` calls) | P4 |
 
 ---
 
 ## Next Session Start
 
-1. Check GitHub Projects Master Board for any new issues
-2. Pick from backlog — P1 auto-scroll is the highest-value next item
-3. `git pull` — main is clean, no conflicts expected
+1. **Manual first:** Delete `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` from Vercel project settings dashboard
+2. Check GitHub Projects Master Board for any new issues
+3. Pick from backlog — Routes filtering is the highest-value next item
+4. `git pull` — main is clean, no conflicts expected
