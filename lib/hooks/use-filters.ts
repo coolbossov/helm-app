@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo, useCallback } from "react";
-import type { ContactFilters, ContactMarkerData } from "@/types";
+import type { ContactFilters, CompanyMarkerData } from "@/types";
 
 const INITIAL_FILTERS: ContactFilters = {
   business_types: [],
@@ -13,7 +13,7 @@ const INITIAL_FILTERS: ContactFilters = {
   search: "",
 };
 
-export function useFilters(markers: ContactMarkerData[]) {
+export function useFilters(markers: CompanyMarkerData[]) {
   const [filters, setFilters] = useState<ContactFilters>(INITIAL_FILTERS);
 
   const filtered = useMemo(() => {

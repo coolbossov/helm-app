@@ -22,6 +22,14 @@ import { Button, Card, CardHeader, CardContent, Badge, Spinner } from "@/compone
 
 // --- Types ---
 
+interface VisitLogEntry {
+  id: string;
+  created_at: string;
+  name: string;
+  route_id?: string;
+  stop_id?: string;
+}
+
 interface SyncLog {
   id: string;
   started_at: string;
@@ -414,6 +422,25 @@ export default function SettingsPage() {
     fetchLogs();
   }, [fetchLogs]);
 
+  // Visit log
+  const [visitLog, setVisitLog] = useState<VisitLogEntry[]>([]);
+  const [visitLogLoading, setVisitLogLoading] = useState(false);
+  const [visitLogLoaded, setVisitLogLoaded] = useState(false);
+
+  const fetchVisitLog = useCallback(async () => {
+    setVisitLogLoading(true);
+    try {
+      const res = await fetch("/api/visit-log");
+      if (res.ok) {
+        const json = await res.json();
+        setVisitLog(json.data ?? []);
+        setVisitLogLoaded(true);
+      }
+    } catch { /* ignore */ } finally {
+      setVisitLogLoading(false);
+    }
+  }, []);
+
   // --- Pull Sync ---
 
   async function handleSync() {
@@ -702,6 +729,58 @@ export default function SettingsPage() {
                         {log.error_message}
                       </p>
                     )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Visit Log */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <MapPin className="h-4 w-4 text-green-600" />
+              <h2 className="text-sm font-semibold text-gray-900">Visit Log</h2>
+            </div>
+            {!visitLogLoaded && (
+              <Button variant="secondary" onClick={fetchVisitLog} disabled={visitLogLoading} className="text-xs py-1 px-2 h-auto">
+                {visitLogLoading ? <Spinner size="sm" /> : "Load"}
+              </Button>
+            )}
+            {visitLogLoaded && (
+              <Button variant="secondary" onClick={fetchVisitLog} disabled={visitLogLoading} className="text-xs py-1 px-2 h-auto">
+                {visitLogLoading ? <Spinner size="sm" /> : <RefreshCw className="h-3 w-3" />}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent>
+          {!visitLogLoaded && !visitLogLoading && (
+            <p className="text-center text-sm text-gray-500 py-4">
+              Click Load to see recent visit activity.
+            </p>
+          )}
+          {visitLogLoading && (
+            <div className="flex justify-center py-4"><Spinner /></div>
+          )}
+          {visitLogLoaded && visitLog.length === 0 && (
+            <p className="text-center text-sm text-gray-500 py-4">
+              No visits logged yet.
+            </p>
+          )}
+          {visitLogLoaded && visitLog.length > 0 && (
+            <div className="space-y-2 max-h-80 overflow-y-auto">
+              {visitLog.map((entry) => (
+                <div key={entry.id} className="flex items-center gap-3 rounded-lg border border-gray-100 px-3 py-2 text-sm">
+                  <CheckCircle2 className="h-4 w-4 text-green-500 shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="font-medium text-gray-900 truncate block">{entry.name}</span>
+                    <span className="text-xs text-gray-400">
+                      {new Date(entry.created_at).toLocaleString()}
+                    </span>
                   </div>
                 </div>
               ))}

@@ -16,7 +16,7 @@ export function useCoverage(enabled: boolean) {
       .then((json) => {
         const map = new Map<string, Date>();
         for (const row of json.data ?? []) {
-          map.set(row.contact_id, new Date(row.last_visited_at));
+          map.set(row.company_id, new Date(row.last_visited_at));
         }
         setCoverageMap(map);
       })

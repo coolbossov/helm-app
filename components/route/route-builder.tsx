@@ -9,14 +9,14 @@ import { StopList } from "@/components/route/stop-list";
 import { RouteStats } from "@/components/route/route-stats";
 import { ImportStopsModal } from "@/components/route/import-stops-modal";
 import { Button, Input, Spinner } from "@/components/ui";
-import { useContacts, useFilters } from "@/lib/hooks";
+import { useCompanies, useFilters } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
 import { useRouteBuilder } from "@/lib/hooks/use-route-builder";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 
 export function RouteBuilder() {
   const router = useRouter();
-  const { markers, loading } = useContacts();
+  const { markers, loading } = useCompanies();
   const { filters, filtered, updateFilter } = useFilters(markers);
   const { settings } = useMapSettings();
   const {
@@ -35,7 +35,7 @@ export function RouteBuilder() {
   const [importOpen, setImportOpen] = useState(false);
 
   const handleMarkerClick = useCallback(
-    (contact: ContactMarkerData) => {
+    (contact: CompanyMarkerData) => {
       setSelectedId(contact.id);
       addStop(contact);
     },
@@ -51,7 +51,7 @@ export function RouteBuilder() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: routeName.trim(),
-          stop_ids: stops.map((s) => s.contact.id),
+          stop_ids: stops.map((s) => s.company.id),
         }),
       });
       const json = await res.json();

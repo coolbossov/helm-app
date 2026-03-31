@@ -128,7 +128,7 @@ export interface SyncedCompany {
   updated_at: string;
 }
 
-export interface ContactMarkerData {
+export interface CompanyMarkerData {
   id: string;
   zoho_id: string;
   last_name: string;
@@ -142,8 +142,6 @@ export interface ContactMarkerData {
   visit_status: VisitStatus | null;
   last_visit_date: string | null;
 }
-
-export type CompanyMarkerData = ContactMarkerData;
 
 export interface ContactFilters {
   business_types: string[];

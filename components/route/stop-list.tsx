@@ -30,7 +30,7 @@ export function StopList({ stops, onMove, onRemove, className }: StopListProps) 
   return (
     <ol className={cn("space-y-1.5", className)}>
       {stops.map((stop, index) => {
-        const contact = stop.contact;
+        const contact = stop.company;
         const name = getDisplayName(contact);
         const types = contact.business_type.join(", ");
 
@@ -89,7 +89,7 @@ interface DrivingStopProps {
   timeWindowStart?: string | null;
   timeWindowEnd?: string | null;
   expectedDurationMin?: number;
-  onStatusChange: (status: "pending" | "visited" | "skipped") => void;
+  onStatusChange: (status: "pending" | "visited" | "skipped") => void | Promise<void>;
   onToggleExpand?: () => void;
   expanded?: boolean;
 }

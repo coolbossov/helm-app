@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState, useEffect } from "react";
+import { use, useState, useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -10,6 +10,8 @@ import {
   CheckCircle,
   Map as MapIcon,
   Clock,
+  AlertTriangle,
+  XCircle,
 } from "lucide-react";
 import { DrivingStop } from "@/components/route/stop-list";
 import { RouteStats } from "@/components/route/route-stats";
@@ -43,6 +45,34 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedMode, setSelectedMode] = useState<OptimizationMode>("fastest");
   const [expandedStop, setExpandedStop] = useState<string | null>(null);
+
+  // Toast state
+  const [toast, setToast] = useState<{ message: string; type: "warning" | "error" } | null>(null);
+
+  // Auto-dismiss toast after 5s
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // Refs for auto-scroll
+  const stopRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+  const progressRef = useRef<HTMLDivElement>(null);
+
+  const scrollToNextPending = useCallback((stopId: string) => {
+    if (!route) return;
+    const linkedStops = (route.route_stops ?? []).filter(
+      (s) => s.synced_companies || s.synced_contacts
+    );
+    const nextPending = linkedStops.find((s) => s.id !== stopId && s.status === "pending");
+    if (nextPending) {
+      stopRefs.current.get(nextPending.id)?.scrollIntoView({ behavior: "smooth", block: "center" });
+    } else {
+      // All done — scroll to progress bar
+      progressRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [route]);
 
   const handleOptimize = async (mode?: OptimizationMode) => {
     setOptimizing(true);
@@ -143,7 +173,7 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
 
       {/* Progress bar */}
       {linkedStops.length > 0 && (
-        <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+        <div ref={progressRef} className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Progress</span>
             <span className="text-sm text-gray-500">
@@ -226,7 +256,13 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
             const isExpanded = expandedStop === stop.id;
 
             return (
-              <div key={stop.id}>
+              <div
+                key={stop.id}
+                ref={(el) => {
+                  if (el) stopRefs.current.set(stop.id, el);
+                  else stopRefs.current.delete(stop.id);
+                }}
+              >
                 <DrivingStop
                   index={index}
                   name={name}
@@ -237,7 +273,28 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
                   timeWindowStart={stop.time_window_start}
                   timeWindowEnd={stop.time_window_end}
                   expectedDurationMin={stop.expected_duration_min}
-                  onStatusChange={(s) => updateStopStatus(stop.id, s)}
+                  onStatusChange={async (s) => {
+                    if (s === "visited") {
+                      const meta = await updateStopStatus(stop.id, s);
+                      scrollToNextPending(stop.id);
+                      if (meta && "visit_activity" in meta) {
+                        if (meta.visit_activity.status === "skipped") {
+                          setToast({
+                            message: `Visit logged locally — couldn't find matching CRM contact (${meta.visit_activity.reason})`,
+                            type: "warning",
+                          });
+                        } else if (meta.visit_activity.status === "error") {
+                          setToast({
+                            message: "Visit logged locally — CRM activity log failed",
+                            type: "error",
+                          });
+                        }
+                      }
+                    } else {
+                      updateStopStatus(stop.id, s);
+                      if (s === "skipped") scrollToNextPending(stop.id);
+                    }
+                  }}
                   onToggleExpand={() => setExpandedStop(isExpanded ? null : stop.id)}
                   expanded={isExpanded}
                 />
@@ -379,6 +436,31 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
         </div>
       )}
     </div>
+
+    {/* Toast notification */}
+    {toast && (
+      <div className="fixed bottom-6 left-4 right-4 z-50">
+        <div
+          className={cn(
+            "max-w-sm mx-auto flex items-start gap-3 rounded-xl px-4 py-3 shadow-lg",
+            toast.type === "warning" ? "bg-amber-500 text-white" : "bg-red-600 text-white"
+          )}
+        >
+          {toast.type === "warning" ? (
+            <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          ) : (
+            <XCircle className="h-4 w-4 shrink-0 mt-0.5" />
+          )}
+          <p className="flex-1 text-sm">{toast.message}</p>
+          <button
+            onClick={() => setToast(null)}
+            className="shrink-0 text-white/80 hover:text-white text-lg leading-none"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    )}
     </div>
   );
 }

@@ -16,12 +16,12 @@ import {
   PlusCircle,
   Save,
 } from "lucide-react";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 import { Spinner } from "@/components/ui";
 
 interface RouteBuilderProps {
-  stops: ContactMarkerData[];
-  allFiltered: ContactMarkerData[];
+  stops: CompanyMarkerData[];
+  allFiltered: CompanyMarkerData[];
   onRemove: (id: string) => void;
   onReorder: (from: number, to: number) => void;
   onAddAll: () => void;
@@ -31,9 +31,9 @@ interface RouteBuilderProps {
   onSaveRoute: () => Promise<string | null>;
 }
 
-function buildGoogleMapsLink(batch: ContactMarkerData[]): string {
+function buildGoogleMapsLink(batch: CompanyMarkerData[]): string {
   if (batch.length === 0) return "";
-  const encode = (c: ContactMarkerData) =>
+  const encode = (c: CompanyMarkerData) =>
     encodeURIComponent(`${c.latitude},${c.longitude}`);
   if (batch.length === 1) {
     return `https://www.google.com/maps/search/?api=1&query=${encode(batch[0])}`;
@@ -46,7 +46,7 @@ function buildGoogleMapsLink(batch: ContactMarkerData[]): string {
   return url;
 }
 
-function buildCSV(stops: ContactMarkerData[]): string {
+function buildCSV(stops: CompanyMarkerData[]): string {
   const header = "Stop #,Name,Organization,Lat,Lng,Visit Status";
   const rows = stops.map((s, i) => {
     const name = [s.account_name, s.last_name].filter(Boolean).join(" / ");
@@ -62,7 +62,7 @@ function buildCSV(stops: ContactMarkerData[]): string {
   return [header, ...rows].join("\n");
 }
 
-function downloadCSV(stops: ContactMarkerData[]) {
+function downloadCSV(stops: CompanyMarkerData[]) {
   const csv = buildCSV(stops);
   const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -75,8 +75,8 @@ function downloadCSV(stops: ContactMarkerData[]) {
 }
 
 // Split stops into batches of 10 (Google Maps limit)
-function splitBatches(stops: ContactMarkerData[]): ContactMarkerData[][] {
-  const batches: ContactMarkerData[][] = [];
+function splitBatches(stops: CompanyMarkerData[]): CompanyMarkerData[][] {
+  const batches: CompanyMarkerData[][] = [];
   for (let i = 0; i < stops.length; i += 10) {
     batches.push(stops.slice(i, i + 10));
   }

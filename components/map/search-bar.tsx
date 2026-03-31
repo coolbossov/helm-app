@@ -3,12 +3,12 @@
 import { useState, useRef, useEffect, useMemo, memo } from "react";
 import { Search, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 import { BUSINESS_TYPE_COLORS } from "@/types";
 
 interface SearchBarProps {
-  contacts: ContactMarkerData[];
-  onSelect: (contact: ContactMarkerData) => void;
+  contacts: CompanyMarkerData[];
+  onSelect: (contact: CompanyMarkerData) => void;
   value: string;
   onChange: (value: string) => void;
   className?: string;

@@ -1,5 +1,5 @@
 export { useAuth } from "./use-auth";
-export { useContacts, useContactDetail } from "./use-contacts";
+export { useCompanies, useContactDetail } from "./use-contacts";
 export { useFilters } from "./use-filters";
 export { useIsMobile } from "./use-mobile";
 export { useMap } from "./use-map";

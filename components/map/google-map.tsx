@@ -10,7 +10,7 @@ import {
   CLUSTER_MAX_ZOOM,
 } from "@/types";
 import { HOME_BASE } from "@/types/maps";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 import type { MapSettings } from "@/lib/hooks/use-map-settings";
 import { Spinner } from "@/components/ui";
 
@@ -32,8 +32,8 @@ interface PlaceMarker {
 }
 
 interface GoogleMapViewProps {
-  contacts: ContactMarkerData[];
-  onMarkerClick: (contact: ContactMarkerData) => void;
+  contacts: CompanyMarkerData[];
+  onMarkerClick: (contact: CompanyMarkerData) => void;
   selectedId: string | null;
   settings: MapSettings;
   findLeadsMode?: boolean;
@@ -48,11 +48,11 @@ interface GoogleMapViewProps {
   onBoundsChange?: (bounds: { north: number; south: number; east: number; west: number }) => void;
 }
 
-function getCoverageRing(contact: ContactMarkerData): string {
+function getCoverageRing(contact: CompanyMarkerData): string {
   return getVisitRecencyColor(contact.last_visit_date);
 }
 
-function getMarkerColor(contact: ContactMarkerData, visitColorMode: boolean): string {
+function getMarkerColor(contact: CompanyMarkerData, visitColorMode: boolean): string {
   if (visitColorMode) {
     const status = contact.visit_status ?? "Never Visited";
     return VISIT_STATUS_COLORS[status] ?? VISIT_STATUS_COLORS["Never Visited"];
@@ -61,14 +61,14 @@ function getMarkerColor(contact: ContactMarkerData, visitColorMode: boolean): st
   return type ? (BUSINESS_TYPE_COLORS[type] || BUSINESS_TYPE_COLORS.Other) : BUSINESS_TYPE_COLORS.Other;
 }
 
-function getMarkerSize(contact: ContactMarkerData): number {
+function getMarkerSize(contact: CompanyMarkerData): number {
   if (contact.priority === "High Priority" || contact.priority === "Hot Priority") return 14;
   if (contact.priority === "Medium Priority" || contact.priority === "Warm Priority") return 11;
   return 9;
 }
 
 function buildContactIcon(
-  contact: ContactMarkerData,
+  contact: CompanyMarkerData,
   settings: MapSettings,
   selected: boolean
 ): google.maps.Symbol {
@@ -151,7 +151,7 @@ export const GoogleMapView = memo(function GoogleMapView({
 
   /* ─── Fix 6: O(1) contact lookup map ─── */
   const contactById = useMemo(() => {
-    const m = new Map<string, ContactMarkerData>();
+    const m = new Map<string, CompanyMarkerData>();
     for (const c of contacts) m.set(c.id, c);
     return m;
   }, [contacts]);
