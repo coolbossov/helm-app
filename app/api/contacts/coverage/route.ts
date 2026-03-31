@@ -14,7 +14,7 @@ export async function GET() {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
   const normalized = (data ?? []).map((row) => ({
-    contact_id: row.id,
+    company_id: row.id,
     last_visited_at: row.last_visit_date,
   }));
 

@@ -4,11 +4,11 @@ import { useRef, useState } from "react";
 import { X, Upload, FileText, AlertCircle, CheckCircle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { cn } from "@/lib/utils";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 
 interface ImportStopsModalProps {
   onClose: () => void;
-  onImport: (contacts: ContactMarkerData[]) => void;
+  onImport: (contacts: CompanyMarkerData[]) => void;
 }
 
 interface ParsedRow {
@@ -19,7 +19,7 @@ interface ParsedRow {
 interface ImportResult {
   name: string;
   address: string;
-  contact: ContactMarkerData | null;
+  contact: CompanyMarkerData | null;
   error?: string;
 }
 
@@ -75,7 +75,7 @@ export function ImportStopsModal({ onClose, onImport }: ImportStopsModalProps) {
       if (!res.ok) throw new Error(json.error ?? "Import failed");
 
       const importResults: ImportResult[] = json.data.map(
-        (r: { name: string; address: string; contact: ContactMarkerData | null; error?: string }) => ({
+        (r: { name: string; address: string; contact: CompanyMarkerData | null; error?: string }) => ({
           name: r.name,
           address: r.address,
           contact: r.contact ? {

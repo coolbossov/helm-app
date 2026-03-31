@@ -1,4 +1,4 @@
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 
 interface LatLng {
   lat: number;
@@ -49,11 +49,11 @@ function pointToSegmentKm(point: LatLng, start: LatLng, end: LatLng): number {
  * Returns contacts sorted by their projection position along the segment.
  */
 export function contactsInCorridor(
-  contacts: ContactMarkerData[],
+  contacts: CompanyMarkerData[],
   start: LatLng,
   end: LatLng,
   radiusKm = 8
-): ContactMarkerData[] {
+): CompanyMarkerData[] {
   const dx = end.lng - start.lng;
   const dy = end.lat - start.lat;
 

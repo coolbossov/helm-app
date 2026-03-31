@@ -11,10 +11,10 @@ import { MapSettingsButton } from "@/components/map/map-settings";
 import { CoverageLegend } from "@/components/map/coverage-legend";
 import { VisitStatusLegend } from "@/components/map/visit-status-legend";
 import { BottomSheet, Spinner } from "@/components/ui";
-import { useContacts, useFilters, useIsMobile } from "@/lib/hooks";
+import { useCompanies, useFilters, useIsMobile } from "@/lib/hooks";
 import { useMapSettings } from "@/lib/hooks/use-map-settings";
 import { contactsInCorridor } from "@/lib/utils/geo";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 import type { DiscoveryResult } from "@/app/api/leads/discover/route";
 
 /* ─── Fix 8: Dynamic imports for heavy panels ─── */
@@ -44,7 +44,7 @@ function MapPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const isMobile = useIsMobile();
-  const { markers, loading, error, truncated, refetch } = useContacts();
+  const { markers, loading, error, truncated, refetch } = useCompanies();
   const { filters, filtered, updateFilter, resetFilters, activeFilterCount } =
     useFilters(markers);
   const { settings, updateSetting } = useMapSettings();
@@ -80,9 +80,9 @@ function MapPageInner() {
   // Route builder state
   const [routeBuilderOpen, setRouteBuilderOpen] = useState(false);
   const [routeBuilderMobileOpen, setRouteBuilderMobileOpen] = useState(false);
-  const [routeStops, setRouteStops] = useState<ContactMarkerData[]>([]);
+  const [routeStops, setRouteStops] = useState<CompanyMarkerData[]>([]);
 
-  const handleMarkerClick = useCallback((contact: ContactMarkerData) => {
+  const handleMarkerClick = useCallback((contact: CompanyMarkerData) => {
     // Auto-plan mode: ignore marker clicks
     if (autoPlanActive) return;
 
@@ -100,7 +100,7 @@ function MapPageInner() {
     setMobileDetailOpen(true);
   }, [autoPlanActive, routeBuilderOpen, routeBuilderMobileOpen]);
 
-  const handleSearchSelect = useCallback((contact: ContactMarkerData) => {
+  const handleSearchSelect = useCallback((contact: CompanyMarkerData) => {
     setSelectedId(contact.id);
     setMobileDetailOpen(true);
   }, []);

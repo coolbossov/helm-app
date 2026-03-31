@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import type { ContactMarkerData, SyncedContact } from "@/types";
+import type { CompanyMarkerData, SyncedContact } from "@/types";
 import { cacheSet, cacheGet } from "@/lib/offline/idb-cache";
 
-export function useContacts() {
-  const [markers, setMarkers] = useState<ContactMarkerData[]>([]);
+export function useCompanies() {
+  const [markers, setMarkers] = useState<CompanyMarkerData[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [truncated, setTruncated] = useState(false);
@@ -18,14 +18,14 @@ export function useContacts() {
       const res = await fetch("/api/contacts?map=true");
       if (!res.ok) throw new Error("Failed to fetch contacts");
       const json = await res.json();
-      const data: ContactMarkerData[] = json.data ?? [];
+      const data: CompanyMarkerData[] = json.data ?? [];
       setMarkers(data);
       setTruncated(json.truncated === true);
       // Cache for offline use
       cacheSet("contacts", data).catch(() => {/* ignore */});
     } catch (err) {
       // Fallback to IndexedDB cache when offline
-      const cached = await cacheGet<ContactMarkerData>("contacts").catch(() => []);
+      const cached = await cacheGet<CompanyMarkerData>("contacts").catch(() => []);
       if (cached.length > 0) {
         setMarkers(cached);
       } else {

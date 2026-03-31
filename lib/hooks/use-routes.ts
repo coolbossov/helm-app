@@ -108,7 +108,7 @@ export function useRoute(id: string | null) {
   const updateStopStatus = useCallback(async (
     stopId: string,
     status: "pending" | "visited" | "skipped"
-  ) => {
+  ): Promise<{ visit_activity: { status: string; reason?: string; company_id?: string } } | { __error: true } | null | void> => {
     if (!id) return;
 
     // Snapshot for rollback
@@ -135,15 +135,18 @@ export function useRoute(id: string | null) {
       if (!res.ok) {
         // Online but server error — rollback optimistic update
         setRoute(snapshot);
-        throw new Error("Server error");
+        return { __error: true };
       }
+      const json = await res.json();
+      return json.meta as { visit_activity: { status: string; reason?: string; company_id?: string } } | null;
     } catch (err) {
       // Network offline — queue for later and keep optimistic state
       if (err instanceof TypeError) {
         await enqueueOfflineMutation("PATCH", `/api/routes/${id}/stops/${stopId}`, { status });
       } else {
-        // Server returned an error — state already rolled back above
+        // Unexpected error — rollback and signal error to caller
         setRoute(snapshot);
+        return { __error: true };
       }
     }
   }, [id]);

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import type { ContactMarkerData } from "@/types";
+import type { CompanyMarkerData } from "@/types";
 
 export interface BuilderStop {
-  contact: ContactMarkerData;
+  company: CompanyMarkerData;
   order: number;
 }
 
@@ -12,16 +12,16 @@ export function useRouteBuilder() {
   const [stops, setStops] = useState<BuilderStop[]>([]);
   const [routeName, setRouteName] = useState("");
 
-  const addStop = useCallback((contact: ContactMarkerData) => {
+  const addStop = useCallback((company: CompanyMarkerData) => {
     setStops((prev) => {
-      if (prev.some((s) => s.contact.id === contact.id)) return prev;
-      return [...prev, { contact, order: prev.length }];
+      if (prev.some((s) => s.company.id === company.id)) return prev;
+      return [...prev, { company, order: prev.length }];
     });
   }, []);
 
-  const removeStop = useCallback((contactId: string) => {
+  const removeStop = useCallback((companyId: string) => {
     setStops((prev) => {
-      const filtered = prev.filter((s) => s.contact.id !== contactId);
+      const filtered = prev.filter((s) => s.company.id !== companyId);
       return filtered.map((s, i) => ({ ...s, order: i }));
     });
   }, []);
@@ -39,16 +39,16 @@ export function useRouteBuilder() {
   const clearStops = useCallback(() => setStops([]), []);
 
   const hasStop = useCallback(
-    (contactId: string) => stops.some((s) => s.contact.id === contactId),
+    (companyId: string) => stops.some((s) => s.company.id === companyId),
     [stops]
   );
 
-  const addMultipleStops = useCallback((contacts: ContactMarkerData[]) => {
+  const addMultipleStops = useCallback((companies: CompanyMarkerData[]) => {
     setStops((prev) => {
-      const existingIds = new Set(prev.map((s) => s.contact.id));
-      const newOnes = contacts.filter((c) => !existingIds.has(c.id));
-      const added = newOnes.map((contact, i) => ({
-        contact,
+      const existingIds = new Set(prev.map((s) => s.company.id));
+      const newOnes = companies.filter((c) => !existingIds.has(c.id));
+      const added = newOnes.map((company, i) => ({
+        company,
         order: prev.length + i,
       }));
       return [...prev, ...added];
