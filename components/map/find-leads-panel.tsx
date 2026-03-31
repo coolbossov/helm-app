@@ -4,10 +4,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  ArrowLeft,
   Check,
+  ChevronRight,
   Loader2,
   MapPin,
   Phone,
+  Plus,
+  Route,
   Search,
   Star,
   X,
@@ -50,10 +54,25 @@ interface FindLeadsPanelProps {
   onSearchCompleted: () => void;
 }
 
-type ConfirmState = "idle" | "route-prompt";
+type ConfirmState =
+  | "idle"
+  | "route-prompt"          // two-choice screen
+  | "new-route-form"        // name + date fields
+  | "existing-route-picker"; // list of non-completed routes
+
+interface ExistingRoute {
+  id: string;
+  name: string;
+  status: string;
+  planned_date: string | null;
+}
 
 function defaultRouteName() {
   return `Route ${new Date().toLocaleDateString()}`;
+}
+
+function todayIso() {
+  return new Date().toISOString().split("T")[0];
 }
 
 async function readResponsePayload(response: Response): Promise<Record<string, unknown>> {
@@ -86,10 +105,18 @@ export function FindLeadsPanel({
   const [selectedType, setSelectedType] = useState<string>("");
   const [confirmState, setConfirmState] = useState<ConfirmState>("idle");
   const [addingLeads, setAddingLeads] = useState(false);
+  // New-route form state
   const [routeName, setRouteName] = useState(defaultRouteName);
+  const [routeDate, setRouteDate] = useState(todayIso);
   const [isCreatingRoute, setIsCreatingRoute] = useState(false);
   const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeCreated, setRouteCreated] = useState(false);
+  // Existing-route picker state
+  const [existingRoutes, setExistingRoutes] = useState<ExistingRoute[]>([]);
+  const [loadingRoutes, setLoadingRoutes] = useState(false);
+  const [selectedRouteId, setSelectedRouteId] = useState<string | null>(null);
+  const [addingToRoute, setAddingToRoute] = useState(false);
+  const [addedToRouteId, setAddedToRouteId] = useState<string | null>(null);
+  // Shared result state
   const [lastAddedCount, setLastAddedCount] = useState(0);
   const [lastAddedCompanyIds, setLastAddedCompanyIds] = useState<string[]>([]);
   const [localAddedIds, setLocalAddedIds] = useState<Set<string>>(new Set());
@@ -133,10 +160,10 @@ export function FindLeadsPanel({
     setLoading(true);
     setError(null);
     setConfirmState("idle");
-    setRouteCreated(false);
     setRouteError(null);
     setLastAddedCount(0);
     setLastAddedCompanyIds([]);
+    setAddedToRouteId(null);
     onSelectedIdsChange(new Set());
 
     try {
@@ -253,8 +280,10 @@ export function FindLeadsPanel({
       setLastAddedCount(added);
       setLastAddedCompanyIds(createdIds);
       setRouteName(defaultRouteName());
+      setRouteDate(todayIso());
       setRouteError(null);
-      setRouteCreated(false);
+      setSelectedRouteId(null);
+      setAddedToRouteId(null);
 
       setConfirmState(added > 0 && createdIds.length > 0 ? "route-prompt" : "idle");
       // Note: createdIds are synced_companies.id UUIDs (not contact IDs)
@@ -273,12 +302,12 @@ export function FindLeadsPanel({
     selectedType,
   ]);
 
-  const handleCreateRoute = useCallback(async () => {
+  // Create a brand-new route with name + date, then navigate or stay
+  const handleCreateNewRoute = useCallback(async (navigateAfter: boolean) => {
     if (lastAddedCompanyIds.length === 0 || isCreatingRoute) return;
 
     setIsCreatingRoute(true);
     setRouteError(null);
-    setRouteCreated(false);
 
     try {
       const response = await fetch("/api/routes", {
@@ -286,6 +315,7 @@ export function FindLeadsPanel({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: routeName.trim() || defaultRouteName(),
+          planned_date: routeDate || null,
           stop_ids: lastAddedCompanyIds,
         }),
       });
@@ -301,16 +331,73 @@ export function FindLeadsPanel({
         payload.data && typeof (payload.data as Record<string, unknown>).id === "string"
           ? (payload.data as Record<string, unknown>).id as string
           : null;
-      setRouteCreated(true);
-      if (routeId) {
+
+      if (navigateAfter && routeId) {
         router.push(`/routes/${routeId}`);
+      } else {
+        // Stay on map — reset to idle so user can keep searching
+        setConfirmState("idle");
+        setLastAddedCompanyIds([]);
       }
     } catch (createError) {
       setRouteError(createError instanceof Error ? createError.message : "Failed to create route");
     } finally {
       setIsCreatingRoute(false);
     }
-  }, [isCreatingRoute, lastAddedCompanyIds, routeName, router]);
+  }, [isCreatingRoute, lastAddedCompanyIds, routeDate, routeName, router]);
+
+  // Load non-completed routes for the picker
+  const handleLoadExistingRoutes = useCallback(async () => {
+    setLoadingRoutes(true);
+    try {
+      const res = await fetch("/api/routes");
+      const json = await res.json() as { data?: ExistingRoute[] };
+      if (!res.ok) throw new Error("Failed to load routes");
+      const nonCompleted = (json.data ?? [])
+        .filter((r) => r.status !== "completed")
+        .sort((a, b) => {
+          if (!a.planned_date && !b.planned_date) return 0;
+          if (!a.planned_date) return 1;
+          if (!b.planned_date) return -1;
+          return a.planned_date.localeCompare(b.planned_date);
+        });
+      setExistingRoutes(nonCompleted);
+      setSelectedRouteId(nonCompleted[0]?.id ?? null);
+    } catch {
+      setExistingRoutes([]);
+    } finally {
+      setLoadingRoutes(false);
+    }
+  }, []);
+
+  // Append stops to an existing route
+  const handleAddToExistingRoute = useCallback(async () => {
+    if (!selectedRouteId || lastAddedCompanyIds.length === 0 || addingToRoute) return;
+
+    setAddingToRoute(true);
+    setRouteError(null);
+
+    try {
+      const response = await fetch(`/api/routes/${selectedRouteId}/stops`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ stop_ids: lastAddedCompanyIds }),
+      });
+      const payload = await readResponsePayload(response);
+      if (!response.ok) {
+        const message =
+          typeof payload.error === "string" && payload.error.length > 0
+            ? payload.error
+            : "Failed to add stops to route";
+        throw new Error(message);
+      }
+      setAddedToRouteId(selectedRouteId);
+    } catch (addError) {
+      setRouteError(addError instanceof Error ? addError.message : "Failed to add stops to route");
+    } finally {
+      setAddingToRoute(false);
+    }
+  }, [addingToRoute, lastAddedCompanyIds, selectedRouteId]);
 
   return (
     <div className="flex h-full flex-col">
@@ -484,36 +571,177 @@ export function FindLeadsPanel({
         </div>
       </div>
 
+      {/* ── Route-prompt: two-choice screen ── */}
       {confirmState === "route-prompt" && (
         <div className="space-y-3 border-t border-gray-200 bg-white p-4">
-          <p className="text-sm font-medium text-gray-900">{lastAddedCount} leads added to CRM.</p>
-          <p className="text-xs text-gray-500">
-            {routeCreated
-              ? "Route created. Create another route with these leads?"
-              : "Create a route with these leads?"}
+          <p className="text-sm font-medium text-gray-900">
+            {lastAddedCount} lead{lastAddedCount !== 1 ? "s" : ""} added to CRM.
           </p>
-          <div className="flex items-center gap-2">
-            <input
-              value={routeName}
-              onChange={(event) => setRouteName(event.target.value)}
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
-              placeholder="Route name"
-            />
-            <button
-              onClick={() => void handleCreateRoute()}
-              disabled={isCreatingRoute}
-              className="rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
-            >
-              {isCreatingRoute ? "Saving..." : "Save"}
-            </button>
-          </div>
-          {routeError && <p className="text-xs text-red-600">{routeError}</p>}
+          <p className="text-xs text-gray-500">Add them to a route?</p>
+          <button
+            onClick={() => setConfirmState("new-route-form")}
+            className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left hover:bg-gray-50"
+          >
+            <div className="flex items-center gap-2">
+              <Plus className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-gray-900">Create new route</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
+          <button
+            onClick={() => {
+              setConfirmState("existing-route-picker");
+              void handleLoadExistingRoutes();
+            }}
+            className="flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-4 py-3 text-left hover:bg-gray-50"
+          >
+            <div className="flex items-center gap-2">
+              <Route className="h-4 w-4 text-blue-600" />
+              <span className="text-sm font-medium text-gray-900">Add to existing route</span>
+            </div>
+            <ChevronRight className="h-4 w-4 text-gray-400" />
+          </button>
           <button
             onClick={() => setConfirmState("idle")}
             className="text-xs font-medium text-gray-500 hover:text-gray-700"
           >
             Skip
           </button>
+        </div>
+      )}
+
+      {/* ── New-route form ── */}
+      {confirmState === "new-route-form" && (
+        <div className="space-y-3 border-t border-gray-200 bg-white p-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setConfirmState("route-prompt")}
+              className="rounded p-1 text-gray-400 hover:text-gray-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <p className="text-sm font-medium text-gray-900">New route</p>
+          </div>
+          <div className="space-y-2">
+            <input
+              value={routeName}
+              onChange={(e) => setRouteName(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+              placeholder="Route name"
+            />
+            <input
+              type="date"
+              value={routeDate}
+              onChange={(e) => setRouteDate(e.target.value)}
+              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500"
+            />
+          </div>
+          {routeError && <p className="text-xs text-red-600">{routeError}</p>}
+          <div className="flex gap-2">
+            <button
+              onClick={() => void handleCreateNewRoute(true)}
+              disabled={isCreatingRoute}
+              className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {isCreatingRoute ? <Loader2 className="mx-auto h-4 w-4 animate-spin" /> : "Save & Open"}
+            </button>
+            <button
+              onClick={() => void handleCreateNewRoute(false)}
+              disabled={isCreatingRoute}
+              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Save & Stay
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Existing-route picker ── */}
+      {confirmState === "existing-route-picker" && (
+        <div className="space-y-3 border-t border-gray-200 bg-white p-4">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setConfirmState("route-prompt")}
+              className="rounded p-1 text-gray-400 hover:text-gray-600"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <p className="text-sm font-medium text-gray-900">Add to route</p>
+          </div>
+
+          {loadingRoutes && (
+            <div className="flex justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            </div>
+          )}
+
+          {!loadingRoutes && existingRoutes.length === 0 && (
+            <p className="text-xs text-gray-500">No planned or in-progress routes found.</p>
+          )}
+
+          {!loadingRoutes && existingRoutes.length > 0 && !addedToRouteId && (
+            <div className="max-h-48 space-y-1 overflow-y-auto">
+              {existingRoutes.map((route) => (
+                <button
+                  key={route.id}
+                  onClick={() => setSelectedRouteId(route.id)}
+                  className={`flex w-full items-center justify-between rounded-lg border px-3 py-2.5 text-left transition-colors ${
+                    selectedRouteId === route.id
+                      ? "border-blue-500 bg-blue-50"
+                      : "border-gray-200 bg-white hover:bg-gray-50"
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-medium text-gray-900">{route.name}</p>
+                    <p className="text-xs text-gray-500">
+                      {route.status === "in_progress" ? "In Progress" : "Planned"}
+                      {route.planned_date && ` · ${new Date(route.planned_date + "T12:00:00").toLocaleDateString()}`}
+                    </p>
+                  </div>
+                  {selectedRouteId === route.id && (
+                    <Check className="h-4 w-4 shrink-0 text-blue-600" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* After successfully adding — show Open / Stay options */}
+          {addedToRouteId && (
+            <div className="space-y-2">
+              <p className="text-xs text-green-700">
+                <Check className="mr-1 inline h-3 w-3" />
+                Stops added successfully.
+              </p>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => router.push(`/routes/${addedToRouteId}`)}
+                  className="flex-1 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white hover:bg-blue-700"
+                >
+                  Open Route
+                </button>
+                <button
+                  onClick={() => { setConfirmState("idle"); setLastAddedCompanyIds([]); }}
+                  className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  Stay on Map
+                </button>
+              </div>
+            </div>
+          )}
+
+          {routeError && <p className="text-xs text-red-600">{routeError}</p>}
+
+          {!addedToRouteId && !loadingRoutes && existingRoutes.length > 0 && (
+            <button
+              onClick={() => void handleAddToExistingRoute()}
+              disabled={!selectedRouteId || addingToRoute}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-50"
+            >
+              {addingToRoute ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+              {addingToRoute ? "Adding..." : "Add to Selected Route"}
+            </button>
+          )}
         </div>
       )}
 
