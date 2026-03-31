@@ -63,17 +63,20 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   // Resolve company → contact (unambiguous 1-to-1 matches only)
+  // Use .in() on account_name for safe exact matching — avoids comma-injection
+  // issues that arise from building raw PostgREST .or() filter strings.
   const companyNames = [...new Set(companyRows.map((c) => c.company_name).filter(Boolean))];
   const contactByAccount = new Map<string, string>();
 
   if (companyNames.length > 0) {
-    const ilikeFilter = companyNames
-      .map((n) => `account_name.ilike."${n.replace(/"/g, '""')}"`)
-      .join(",");
-    const { data: contacts } = await supabase
+    const { data: contacts, error: contactsError } = await supabase
       .from("synced_contacts")
       .select("id, account_name")
-      .or(ilikeFilter);
+      .in("account_name", companyNames);
+
+    if (contactsError) {
+      return NextResponse.json({ error: contactsError.message }, { status: 500 });
+    }
 
     const linkedContacts = (contacts ?? []) as ContactRow[];
     const accountCounts = new Map<string, number>();
