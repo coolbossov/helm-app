@@ -26,11 +26,12 @@ export async function GET() {
   // Shape response: pull company_name from metadata if available, else fall back to contact name
   const entries = (data ?? []).map((row) => {
     const meta = (row.metadata ?? {}) as Record<string, unknown>;
-    const contact = row.synced_contacts as unknown as { last_name: string; account_name: string | null } | null;
+    // Supabase returns FK joins as a single object (not array) when the relation is many-to-one
+    const raw = row.synced_contacts;
+    const contact = (Array.isArray(raw) ? raw[0] : raw) as { last_name: string; account_name: string | null } | null | undefined;
     return {
       id: row.id,
       created_at: row.created_at,
-      // Display the account_name (company name) if available
       name: contact?.account_name ?? contact?.last_name ?? "Unknown",
       route_id: meta.route_id as string | undefined,
       stop_id: meta.stop_id as string | undefined,

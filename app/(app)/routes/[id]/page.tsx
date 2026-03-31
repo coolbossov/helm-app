@@ -274,25 +274,22 @@ export default function RoutePage({ params }: { params: Promise<Params> }) {
                   timeWindowEnd={stop.time_window_end}
                   expectedDurationMin={stop.expected_duration_min}
                   onStatusChange={async (s) => {
-                    if (s === "visited") {
-                      const meta = await updateStopStatus(stop.id, s);
-                      scrollToNextPending(stop.id);
-                      if (meta && "visit_activity" in meta) {
-                        if (meta.visit_activity.status === "skipped") {
-                          setToast({
-                            message: `Visit logged locally — couldn't find matching CRM contact (${meta.visit_activity.reason})`,
-                            type: "warning",
-                          });
-                        } else if (meta.visit_activity.status === "error") {
-                          setToast({
-                            message: "Visit logged locally — CRM activity log failed",
-                            type: "error",
-                          });
-                        }
+                    const meta = await updateStopStatus(stop.id, s);
+                    if (s === "visited" || s === "skipped") scrollToNextPending(stop.id);
+                    if (meta && "__error" in meta) {
+                      setToast({ message: "Failed to save status — please try again", type: "error" });
+                    } else if (meta && "visit_activity" in meta) {
+                      if (meta.visit_activity.status === "skipped") {
+                        setToast({
+                          message: `Visit logged locally — couldn't find matching CRM contact (${meta.visit_activity.reason})`,
+                          type: "warning",
+                        });
+                      } else if (meta.visit_activity.status === "error") {
+                        setToast({
+                          message: "Visit logged locally — CRM activity log failed",
+                          type: "error",
+                        });
                       }
-                    } else {
-                      updateStopStatus(stop.id, s);
-                      if (s === "skipped") scrollToNextPending(stop.id);
                     }
                   }}
                   onToggleExpand={() => setExpandedStop(isExpanded ? null : stop.id)}
