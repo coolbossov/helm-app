@@ -16,6 +16,7 @@ Copy `.env.local.example` to `.env.local` and fill in real values. Never commit 
 | `ZOHO_CLIENT_SECRET` | Zoho Bigin | OAuth client secret | Yes |
 | `ZOHO_REFRESH_TOKEN` | Zoho Bigin | OAuth refresh token (long-lived) | Yes |
 | `ZOHO_ACCOUNT_URL` <!-- TODO: verify --> | Zoho Bigin | Bigin API base URL (e.g. `https://www.zohoapis.com/bigin/v2`) | Yes |
+| `READ_ONLY` | Internal | Write-freeze guard — set to `"true"` during DB migrations to return 503 on mutating requests (POST/PUT/PATCH/DELETE). GET/HEAD/OPTIONS continue to flow. `/api/sync/cron` is exempt so scheduled sync jobs keep running during a freeze. Leave unset in normal operation. | No |
 
 **Not present / removed:**
 - `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` — deleted from Vercel settings 2026-03-31, no longer needed
