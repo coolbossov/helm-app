@@ -17,7 +17,7 @@
 | QR Codes | qrcode.react | ^4.2.0 |
 | Hosting | Vercel | — |
 | Live URLs | https://helm-app-drab.vercel.app / https://route.sapicture.day | — |
-| Supabase Project | `lufdqoilfgjjuohteyrs` (labeled "Booksa" in dashboard — ignore the name) | — |
+| Supabase Project | `qnfafwqjjbgiaygrdcoc` (`sapd-internal`, MyStartup.me org, us-east-2 — co-tenant with Portal since 2026-04-24 migration from old ref `lufdqoilfgjjuohteyrs` on Booksa DB) | — |
 | PWA | Yes — `public/manifest.json`, theme `#ff0092`, start `/map` | — |
 
 ## Components
