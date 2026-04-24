@@ -16,6 +16,7 @@ Copy `.env.local.example` to `.env.local` and fill in real values. Never commit 
 | `ZOHO_CLIENT_SECRET` | Zoho Bigin | OAuth client secret | Yes |
 | `ZOHO_REFRESH_TOKEN` | Zoho Bigin | OAuth refresh token (long-lived) | Yes |
 | `ZOHO_ACCOUNT_URL` <!-- TODO: verify --> | Zoho Bigin | Bigin API base URL (e.g. `https://www.zohoapis.com/bigin/v2`) | Yes |
+| `READ_ONLY` | Maintenance | When set to `true`, `middleware.ts` returns 503 for all non-GET/HEAD/OPTIONS requests (write-freeze). `/api/sync/cron` is excluded from the matcher so the daily cron still runs. Dormant guard — unset in normal operation, set to `true` during DB migration cutover. | No |
 
 **Not present / removed:**
 - `NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID` — deleted from Vercel settings 2026-03-31, no longer needed
