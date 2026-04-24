@@ -2,7 +2,7 @@
 
 **Last Updated:** 2026-04-13
 
-**Supabase Project:** `lufdqoilfgjjuohteyrs` (displayed as "Booksa" in dashboard — correct project for HELM)
+**Supabase Project:** `qnfafwqjjbgiaygrdcoc` (`sapd-internal`, MyStartup.me org, us-east-2 — co-tenant with Portal since 2026-04-24 migration from old ref `lufdqoilfgjjuohteyrs`)
 
 RLS enabled on all tables. Single admin user — no per-user data isolation needed. All "any authenticated user" access is by design (single-user app). Do not add per-user RLS or ownership checks.
 

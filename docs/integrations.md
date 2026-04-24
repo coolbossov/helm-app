@@ -22,9 +22,9 @@
 
 **Failure behavior:** Map data unavailable → empty map with error state. Route save fails → user sees error toast.
 
-**Dashboard:** https://supabase.com/dashboard/project/lufdqoilfgjjuohteyrs
+**Dashboard:** https://supabase.com/dashboard/project/qnfafwqjjbgiaygrdcoc
 
-**Note:** Project is labeled "Booksa" in the Supabase dashboard. This is the correct project for HELM — ignore the display name.
+**Note:** Project `sapd-internal` on MyStartup.me org, us-east-2. Co-tenant with Portal since 2026-04-24 migration from old shared Booksa DB (`lufdqoilfgjjuohteyrs`).
 
 ---
 

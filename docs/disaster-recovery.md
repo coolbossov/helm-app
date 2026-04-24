@@ -8,7 +8,7 @@
 
 **Hosting:** Vercel (Hobby plan)
 **Live URLs:** https://helm-app-drab.vercel.app / https://route.sapicture.day
-**Database:** Supabase project `lufdqoilfgjjuohteyrs`
+**Database:** Supabase project `qnfafwqjjbgiaygrdcoc` (`sapd-internal`, co-tenant with Portal, migrated 2026-04-24 from old ref `lufdqoilfgjjuohteyrs`)
 **Repo:** github.com/coolbossov/helm-app (private)
 
 ---
@@ -38,7 +38,7 @@
 
 **Manual backup:**
 ```bash
-supabase db dump --linked --project-ref lufdqoilfgjjuohteyrs > helm_$(date +%Y%m%d).sql
+supabase db dump --linked --project-ref qnfafwqjjbgiaygrdcoc > helm_$(date +%Y%m%d).sql
 ```
 
 **Re-sync from Bigin:** If `synced_companies`/`synced_contacts` is lost or corrupted, run a full pull sync from the Settings page. This re-imports all companies and contacts from Zoho Bigin. Geocoding must be re-run separately via `POST /api/geocode?target=companies&batch=true`.
