@@ -35,19 +35,21 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - Detail data fetched on marker click (too large to preload for all)
 - CRM sync is manual (Phase 1), triggered from settings page
 
-## Git workflow (enforced — no exceptions)
+## Git workflow (direct to production)
 
-- **Never commit directly to `main`** — all code changes go through a branch + PR
-- **Auto-branch on first code edit** — the moment a session transitions from research/planning to implementation, create a branch before the first file edit. Use prefix conventions: `feat/`, `fix/`, `chore/`, `docs/`
-- **Docs update is part of every PR — not a follow-up** — any change that touches DB schema, API shape, data flows, auth, or architecture must update the relevant `docs/` file(s) in the same commit:
+This repo overrides the global "branch + PR for all dev repos" rule. Helm web app changes ship straight to production.
+
+- **Commit and push directly to `main`** — no feature branches, no PRs, no preview/staging environments. Hosting auto-deploys from `main`.
+- **Run local checks before push** — `npm run lint`, `npx tsc --noEmit`, `npm run build` must all pass. CI runs on push to main but does not gate the deploy.
+- **Docs update is part of every commit — not a follow-up** — any change that touches DB schema, API shape, data flows, auth, or architecture must update the relevant `docs/` file(s) in the same commit:
   - New/altered DB columns or tables → `docs/database.md` (schema + migration history)
   - Architecture or flow change → `docs/architecture.md`
   - Design decision or trade-off → `docs/decisions.md` (add ADR, newest first)
   - New integration or external dependency → `docs/integrations.md`
   - New env var → `docs/environment.md`
   - Any shipped change → `CHANGELOG.md` (add entry under today's date)
-- **End of session** — run `@review-2-code-commit` before pushing. This triggers the `opencode-review` GitHub Action on the PR automatically
-- CI passes → PR is squash-merged automatically and branch is deleted
+- The Kimi pre-commit review hook still runs on every commit. A `BLOCKED` verdict still rejects the commit — fix and retry.
+- Branches + PRs are still acceptable for genuinely high-risk changes (auth, payments, schema migrations) where a preview deploy is wanted before going live. Default is straight-to-main.
 
 ## Architecture Notes
 
