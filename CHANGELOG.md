@@ -1,5 +1,10 @@
 # Route Helm — Changelog
 
+## 2026-05-14
+
+### Improvements
+- Added the repo infra-doc advisory workflow and updated `AGENTS.md` so shared infrastructure changes point at `~/.ai-ops/docs/infrastructure.md` and `/infra-update`
+
 ## 2026-03-30
 
 ### Improvements
