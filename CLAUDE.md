@@ -107,3 +107,15 @@ Interactive Google Map app for SA Picture Day field sales. Displays ~2000+ CRM l
 - `npm run dev` — Start dev server with Turbopack
 - `npm run build` — Production build
 - `npm run lint` — ESLint
+
+## Web Troubleshooting Standard (DevTools MCP)
+
+For any website/frontend/browser-facing task, run this verification loop before marking work complete:
+
+1. Check browser console for new errors/warnings introduced by the change.
+2. Check failed or anomalous network requests relevant to the flow under test.
+3. Run a Lighthouse pass (Performance + Accessibility at minimum) on the changed route.
+4. For interactive pages, check for obvious memory growth/leak patterns during repeated interactions.
+5. Validate responsive behavior in device emulation for at least one mobile viewport.
+
+If Chrome DevTools MCP is available in the current environment, use it for these checks and report findings plus fixes. If MCP is unavailable, run equivalent manual DevTools checks and report that fallback explicitly.
