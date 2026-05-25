@@ -1,5 +1,8 @@
 # Route Helm — Changelog
 
+## 2026-05-25
+- ci: reduce Actions usage by changing Bigin push sync from every 15 minutes to every 6 hours, adding fail-fast curl behavior, CI concurrency, docs-only skips, 15-minute timeouts, and narrower infra advisory triggers.
+
 ## 2026-05-14
 
 ### Improvements
