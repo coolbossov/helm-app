@@ -2,16 +2,24 @@ name: Push Sync to Bigin
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: true
 
 jobs:
   push-sync:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Trigger push sync
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
+          response=$(curl -sS -o /dev/null -w "%{http_code}" \
+            --max-time 30 \
+            --retry 1 \
+            --retry-delay 5 \
             -X GET "${{ secrets.APP_URL }}/api/sync/cron" \
             -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}")
           echo "HTTP status: $response"
