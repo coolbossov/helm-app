@@ -1,5 +1,9 @@
 # Route Helm — Changelog
 
+## 2026-10-07 — Disable unnecessary Vercel previews
+
+- Allow Vercel Git deployments from `main` only; disable automatic PR, Dependabot, feature and staging branch builds without modifying production runtime configuration.
+
 ## 2026-05-25
 - ci: reduce Actions usage by changing Bigin push sync from every 15 minutes to every 6 hours, adding fail-fast curl behavior, CI concurrency, push-only docs skips, 15-minute timeouts, and narrower infra advisory triggers.
 
